@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Recharge Tracker — Trello Power-Up Simulator</title>
+<script src="https://p.trellocdn.com/power-up.min.js"></script>
 <style>
   :root{
     --bg:#1d2125; --panel:#22272b;
@@ -296,9 +297,26 @@
   .set-min{width:44px; text-align:right}
   .set-quickwrap{display:flex; align-items:center; gap:4px; font-size:11px; color:var(--dimmer); font-weight:600; flex:0 0 auto}
   .set-quick{width:92px; text-align:left; font-size:11.5px !important}
+  /* ===== Trello Power-Up: summary view (shown on the card back) ===== */
+  body.tp-summary,body.tp-connector{background:transparent;padding:10px 4px}
+  body.tp-summary .panel,body.tp-connector .panel{display:none}
+  body.tp-connector #summaryView{display:none}
+  #summaryView{display:none;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  body.tp-summary #summaryView{display:block}
+  .sv-row{display:flex;align-items:baseline;gap:8px}
+  .sv-label{font-size:11px;color:#5e6c84;text-transform:uppercase;letter-spacing:.04em;font-weight:700}
+  .sv-total{font-size:20px;font-weight:800;color:#172b4d;font-variant-numeric:tabular-nums}
+  .sv-sub{font-size:12px;color:#5e6c84;margin:3px 0 10px}
+  .sv-btn{appearance:none;border:0;cursor:pointer;background:#0c66e4;color:#fff;font-weight:600;font-size:13px;padding:8px 14px;border-radius:6px}
+  .sv-btn:hover{background:#0055cc}
 </style>
 </head>
 <body>
+<div id="summaryView">
+  <div class="sv-row"><span class="sv-label">Recharge total</span> <b class="sv-total" id="svTotal">—</b></div>
+  <div class="sv-sub" id="svSub">Click below to enter recharge details.</div>
+  <button type="button" class="sv-btn" id="svEdit">Edit Recharge Details</button>
+</div>
 <div class="panel">
   <div class="head">
     <span class="title"><span class="dollar">&#x1F4B2;&#xFE0E;</span>Recharge Activity</span>
@@ -1138,7 +1156,8 @@ function rebuildAll(){
   updateRates(); recalc(); renderPrepurchase(); renderHist();
 }
 
-/* ----- init ----- */
+/* ----- full-app init (standalone + editor modal) ----- */
+function initFullApp(){
 build(); ensureWaivedKeys(); buildWaivers(); setMode('ucd'); recalc(); renderHist(); renderPrepurchase(); updateBudgetStatus();
 requestAnimationFrame(()=>{ RATES.forEach(r=>{ const ref=refs[r.id]; if(ref&&ref.cost) void ref.cost.offsetWidth; }); });
 $('#modeUcd').onclick=()=>{ if(!locked()) setMode('ucd'); };
@@ -1161,6 +1180,63 @@ $('#histBtn').onclick=()=>{ $('#hist').classList.toggle('hidden'); };
 $('#gearBtn').onclick=()=>{ const hidden=$('#settings').classList.toggle('hidden'); if(!hidden) buildSettings(); };
 $('#setDone').onclick=()=>$('#settings').classList.add('hidden');
 $('#setRestore').onclick=restoreDefaults;
+}
+
+/* ----- Trello Power-Up context dispatch ----- */
+/* One hosted file serves four roles, chosen at load time:
+   - connector : hidden iframe Trello loads at the bare URL; registers the card panel
+   - summary   : the compact panel shown on the card back (?view=summary)
+   - editor    : the full tool, opened in a pop-out modal (?view=editor)
+   - standalone : the file opened directly in a browser (no Trello) -> full tool  */
+var SELF = location.origin + location.pathname;              // this file's URL, query stripped
+var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
+
+function getParam(n){ try{ return new URLSearchParams(location.search).get(n); }catch(e){ return null; } }
+
+function initConnector(){
+  window.TrelloPowerUp.initialize({
+    'card-back-section': function(t, opts){
+      return {
+        title: 'Recharge Tracker',
+        icon: TRELLO_ICON,
+        content: { type:'iframe', url: SELF + '?view=summary', height: 104 }
+      };
+    }
+  });
+}
+
+function initSummary(){
+  var t = window.TrelloPowerUp.iframe();
+  window._t = t;
+  var btn = document.getElementById('svEdit');
+  if(btn) btn.addEventListener('click', function(){
+    t.modal({ url: SELF + '?view=editor', title: 'Recharge Details', fullscreen: true, accentColor: '#0c66e4' });
+  });
+  t.render(function(){
+    /* Upload 1: no per-card saving yet, so show a neutral placeholder. */
+    var tot=document.getElementById('svTotal'); if(tot) tot.textContent='$0.00';
+    var sub=document.getElementById('svSub'); if(sub) sub.textContent='Click below to enter recharge details.';
+    return t.sizeTo('#summaryView');
+  });
+}
+
+function initEditor(){
+  window._t = window.TrelloPowerUp.iframe();   // establish Trello iframe context (used for saving in Upload 2)
+  initFullApp();                               // Upload 1: full tool runs in-memory, no load/save yet
+}
+
+function boot(){
+  var view = getParam('view');
+  var framed = (window.self !== window.top);
+  var hasTrello = (typeof window.TrelloPowerUp !== 'undefined');
+  if(hasTrello && framed && view==='summary'){ document.body.classList.add('tp-summary'); initSummary(); }
+  else if(hasTrello && framed && view==='editor'){ initEditor(); }
+  else if(hasTrello && framed && !view){ document.body.classList.add('tp-connector'); initConnector(); }
+  else { initFullApp(); }   // standalone / opened directly in a browser
+}
+
+boot();
 </script>
 </body>
 </html>
