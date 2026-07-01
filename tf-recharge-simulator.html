@@ -299,10 +299,11 @@
   .set-quick{width:92px; text-align:left; font-size:11.5px !important}
   /* ===== Trello Power-Up: summary view (shown on the card back) ===== */
   /* Trello sets data-color-mode="light|dark" on <html>; adapt to both themes. */
-  html[data-color-mode="light"]{--rt-text:#172b4d;--rt-subtle:#626f86}
-  html[data-color-mode="dark"]{--rt-text:#b6c2cf;--rt-subtle:#9fadbc}
+  html[data-color-mode="light"]{--rt-bg:#ffffff;--rt-text:#172b4d;--rt-subtle:#626f86}
+  html[data-color-mode="dark"]{--rt-bg:#242528;--rt-text:#b6c2cf;--rt-subtle:#9fadbc}
   html{background:transparent}
-  body.tp-summary,body.tp-connector{background:transparent;margin:0;padding:0}
+  body.tp-summary{background:var(--rt-bg,transparent);margin:0;padding:0}
+  body.tp-connector{background:transparent;margin:0;padding:0}
   body.tp-summary .panel,body.tp-connector .panel{display:none}
   body.tp-connector #summaryView{display:none}
   #summaryView{display:none;padding:2px 2px 4px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
@@ -1210,15 +1211,28 @@ function initConnector(){
   });
 }
 
+function detectTheme(t){
+  try{ var c=t.getContext&&t.getContext(); if(c&&(c.theme==='dark'||c.theme==='light')) return c.theme; }catch(e){}
+  var a=document.documentElement.getAttribute('data-color-mode'); if(a==='dark'||a==='light') return a;
+  try{ if(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches) return 'dark'; }catch(e){}
+  return 'light';
+}
+function svSub(msg){ var s=document.getElementById('svSub'); if(s) s.textContent=msg; }
 function initSummary(){
   var t = window.TrelloPowerUp.iframe();
   window._t = t;
+  document.documentElement.setAttribute('data-color-mode', detectTheme(t));
   var btn = document.getElementById('svEdit');
   if(btn) btn.addEventListener('click', function(){
-    t.modal({ url: SELF + '?view=editor', title: 'Recharge Details', fullscreen: true, accentColor: '#0c66e4' });
+    svSub('Opening editor…');
+    try{
+      var r = t.modal({ url: SELF + '?view=editor', fullscreen: true, title: 'Recharge Details', accentColor: '#0c66e4' });
+      if(r && typeof r.then==='function'){ r.then(function(){ svSub('Click below to enter recharge details.'); },
+        function(err){ svSub('Could not open: ' + (err&&err.message?err.message:String(err))); }); }
+    }catch(e){ svSub('Error: ' + (e&&e.message?e.message:String(e))); }
   });
   t.render(function(){
-    /* Upload 1: no per-card saving yet, so show a neutral placeholder. */
+    document.documentElement.setAttribute('data-color-mode', detectTheme(t));
     var tot=document.getElementById('svTotal'); if(tot) tot.textContent='$0.00';
     var sub=document.getElementById('svSub'); if(sub) sub.textContent='Click below to enter recharge details.';
     return t.sizeTo('#summaryView');
@@ -1226,7 +1240,7 @@ function initSummary(){
 }
 
 function initEditor(){
-  window._t = window.TrelloPowerUp.iframe();   // establish Trello iframe context (used for saving in Upload 2)
+  try{ window._t = window.TrelloPowerUp.iframe(); }catch(e){}
   initFullApp();                               // Upload 1: full tool runs in-memory, no load/save yet
 }
 
