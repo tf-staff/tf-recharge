@@ -329,8 +329,8 @@
 <div id="summaryView">
   <div class="sv-row"><span class="sv-label">Recharge total</span> <b class="sv-total" id="svTotal">—</b> <span class="sv-tier" id="svTier"></span></div>
   <div class="sv-breakdown" id="svBreakdown"></div>
-  <div class="sv-sub" id="svSub">No charges entered yet.</div>
-  <div class="sv-diag" id="svDiag"></div>
+  <div class="sv-sub" id="svSub">Loading…</div>
+  <div class="sv-diag" id="svDiag">(no render)</div>
 </div>
 <div id="verBadge"></div>
 <div class="panel">
@@ -1217,7 +1217,7 @@ _ready = true;   // from here on, user edits trigger debounced saveCard()
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '0.7';                                         // bump every build so we can confirm deploys
+var VERSION = '0.8';                                         // bump every build so we can confirm deploys
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1295,7 +1295,7 @@ function initConnector(){
         icon: TRELLO_ICON,
         content: { type:'iframe', url: SELF + '?view=summary&v=' + VERSION, height: 150 },
         action: { text: 'Open', callback: function(tt){
-          return tt.modal({ url: SELF + '?view=editor&v=' + VERSION, fullscreen: false, height: 720, title: 'Recharge Details', accentColor: '#0c66e4' });
+          return tt.modal({ url: SELF + '?view=editor&v=' + VERSION, fullscreen: false, height: 900, title: 'Recharge Details', accentColor: '#0c66e4' });
         } }
       };
     }
@@ -1314,7 +1314,6 @@ function svDiag(msg){ var s=document.getElementById('svDiag'); if(s) s.textConte
 function applyTheme(t){
   var d = detectTheme(t);
   document.documentElement.setAttribute('data-color-mode', d.theme);
-  svDiag('v' + VERSION + ' · theme ' + d.theme + ' (' + d.src + ')');
   return d;
 }
 function initSummary(){
@@ -1323,16 +1322,18 @@ function initSummary(){
   applyTheme(t);
   t.render(function(){
     applyTheme(t);
-    var done=function(got){
+    var done=function(tag){
       renderSummary();
-      var dg=document.getElementById('svDiag'); if(dg) dg.textContent += ' \u00b7 data:' + (got?'yes':'no');
+      var dg=document.getElementById('svDiag'); if(dg) dg.textContent = 'v' + VERSION + ' \u00b7 data:' + tag;
       return t.sizeTo('#summaryView');
     };
     try{
       var p = t.get('card','shared','rt');
-      if(p && p.then){ return p.then(function(d){ return done(hydrateState(d)); }, function(){ return done(false); }); }
-    }catch(e){}
-    return done(false);
+      if(p && p.then){ return p.then(
+        function(d){ var ok=hydrateState(d); done(ok ? ('yes n=' + Object.keys((d&&d.qty)||{}).length) : 'empty'); },
+        function(e){ done('err ' + (e&&e.message?e.message:String(e))); }); }
+      else { return done('nopromise'); }
+    }catch(e){ return done('throw ' + (e&&e.message?e.message:String(e))); }
   });
 }
 
