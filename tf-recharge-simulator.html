@@ -314,6 +314,12 @@
   .sv-sub{font-size:12px;color:var(--rt-subtle,#626f86);margin:3px 0 10px}
   .sv-btn{appearance:none;border:0;cursor:pointer;background:#0c66e4;color:#fff;font-weight:600;font-size:13px;padding:8px 14px;border-radius:6px}
   .sv-btn:hover{background:#0055cc}
+  .sv-tier{font-size:11px;font-weight:700;color:var(--rt-subtle,#8a94a6);text-transform:uppercase;letter-spacing:.04em}
+  .sv-breakdown{margin:9px 0 3px;display:flex;flex-direction:column;gap:2px}
+  .sv-brow{display:flex;justify-content:space-between;font-size:12px;color:var(--rt-text,#172b4d);font-variant-numeric:tabular-nums}
+  .sv-brow .k{color:var(--rt-subtle,#8a94a6)}
+  .sv-brow.waived .v{color:#4bce97}
+  .sv-brow.budget .k,.sv-brow.budget .v{font-size:11px}
   .sv-diag{font-size:10px;color:var(--rt-subtle,#8a94a6);margin-top:9px;opacity:.85;font-variant-numeric:tabular-nums}
   #verBadge{position:fixed;right:7px;bottom:6px;font-size:10px;color:#5b6b7a;opacity:.6;z-index:9;pointer-events:none}
   body.tp-summary #verBadge,body.tp-connector #verBadge{display:none}
@@ -321,9 +327,9 @@
 </head>
 <body>
 <div id="summaryView">
-  <div class="sv-row"><span class="sv-label">Recharge total</span> <b class="sv-total" id="svTotal">—</b></div>
-  <div class="sv-sub" id="svSub">Click below to enter recharge details.</div>
-  <button type="button" class="sv-btn" id="svEdit">Edit Recharge Details</button>
+  <div class="sv-row"><span class="sv-label">Recharge total</span> <b class="sv-total" id="svTotal">—</b> <span class="sv-tier" id="svTier"></span></div>
+  <div class="sv-breakdown" id="svBreakdown"></div>
+  <div class="sv-sub" id="svSub">No charges entered yet.</div>
   <div class="sv-diag" id="svDiag"></div>
 </div>
 <div id="verBadge"></div>
@@ -799,6 +805,7 @@ function recalc(){
     if(nw){ nw.hidden=!showNew; nw.disabled=bad; nw.classList.toggle('dim',bad); }
     if(hint) hint.hidden=!bad;
   }
+  saveCard();
 }
 function locked(){ return state.budgetStatus==='billing'; }
 function updateBudgetStatus(){ const sel=$('#budgetStatus'); if(!sel) return; sel.value=state.budgetStatus; sel.className='bstatus status-'+state.budgetStatus;
@@ -1166,10 +1173,19 @@ function rebuildAll(){
   updateRates(); recalc(); renderPrepurchase(); renderHist();
 }
 
+/* Push loaded state values into the raw form controls (build() handles the rows). */
+function syncInputsFromState(){
+  var bi=$('#budgetInput'); if(bi) bi.value=(state.budget!=null?state.budget:'');
+  var wc=$('#waiveChk'); if(wc) wc.checked=state.waiveTime;
+  var wm=$('#waiveMatChk'); if(wm) wm.checked=state.waiveMat;
+  var wd=$('#waived'); if(wd) wd.classList.toggle('hidden', !state.waiveTime);
+  var wdm=$('#waivedMat'); if(wdm) wdm.classList.toggle('hidden', !state.waiveMat);
+}
+
 /* ----- full-app init (standalone + editor modal) ----- */
 function initFullApp(){
 var vb=document.getElementById('verBadge'); if(vb) vb.textContent='v'+VERSION;
-build(); ensureWaivedKeys(); buildWaivers(); setMode('ucd'); recalc(); renderHist(); renderPrepurchase(); updateBudgetStatus();
+build(); ensureWaivedKeys(); buildWaivers(); setMode(state.mode); syncInputsFromState(); recalc(); renderHist(); renderPrepurchase(); updateBudgetStatus();
 requestAnimationFrame(()=>{ RATES.forEach(r=>{ const ref=refs[r.id]; if(ref&&ref.cost) void ref.cost.offsetWidth; }); });
 $('#modeUcd').onclick=()=>{ if(!locked()) setMode('ucd'); };
 $('#modeNon').onclick=()=>{ if(!locked()) setMode('nonuc'); };
@@ -1191,6 +1207,7 @@ $('#histBtn').onclick=()=>{ $('#hist').classList.toggle('hidden'); };
 $('#gearBtn').onclick=()=>{ const hidden=$('#settings').classList.toggle('hidden'); if(!hidden) buildSettings(); };
 $('#setDone').onclick=()=>$('#settings').classList.add('hidden');
 $('#setRestore').onclick=restoreDefaults;
+_ready = true;   // from here on, user edits trigger debounced saveCard()
 }
 
 /* ----- Trello Power-Up context dispatch ----- */
@@ -1200,11 +1217,75 @@ $('#setRestore').onclick=restoreDefaults;
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '0.5';                                         // bump every build so we can confirm deploys
+var VERSION = '0.6';                                         // bump every build so we can confirm deploys
+var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
 
 function getParam(n){ try{ return new URLSearchParams(location.search).get(n); }catch(e){ return null; } }
+
+/* ----- per-card persistence (Trello card-scoped storage) ----- */
+/* We persist only the compact state that defines the bill. History and
+   transient UI state are intentionally left out for now. */
+function serializeState(){
+  return { v:1, mode:state.mode, qty:state.qty, pp:state.prepurchase,
+    budget:state.budget, bstat:state.budgetStatus,
+    wt:state.waiveTime, wm:state.waiveMat, waived:state.waived,
+    quoted:state.quoted, qbase:state.quoteBase };
+}
+function hydrateState(d){
+  if(!d || typeof d!=='object') return false;
+  if(d.mode==='ucd'||d.mode==='nonuc') state.mode=d.mode;
+  RATES.forEach(function(r){ state.qty[r.id] = (d.qty && typeof d.qty[r.id]==='number') ? d.qty[r.id] : 0; });
+  state.prepurchase = Array.isArray(d.pp) ? d.pp.map(function(e){
+    return { id:e.id||'', url:e.url||'', amount:(typeof e.amount==='number'?e.amount:0) }; }) : [];
+  state.budget = (typeof d.budget==='number') ? d.budget : null;
+  state.budgetStatus = d.bstat || 'undefined';
+  state.waiveTime = !!d.wt; state.waiveMat = !!d.wm;
+  state.waived = (d.waived && typeof d.waived==='object') ? d.waived : {};
+  state.quoted = (d.quoted && typeof d.quoted==='object') ? d.quoted : {};
+  state.quoteBase = (d.qbase && typeof d.qbase==='object') ? d.qbase : {};
+  return true;
+}
+function saveCard(){
+  if(!_ready || !_t) return;
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(function(){
+    try{ _t.set('card','shared','rt', serializeState()); }catch(e){}
+  }, 1200);
+}
+function loadCard(cb){
+  if(!_t){ cb && cb(false); return; }
+  var done=false, finish=function(ok){ if(done) return; done=true; cb && cb(ok); };
+  try{
+    var p = _t.get('card','shared','rt');
+    if(p && p.then){ p.then(function(d){ finish(hydrateState(d)); }, function(){ finish(false); }); }
+    else finish(false);
+  }catch(e){ finish(false); }
+}
+
+/* ----- compact read-only summary shown on the card face ----- */
+function renderSummary(){
+  var total = netTotal();
+  var tot=document.getElementById('svTotal'); if(tot) tot.textContent=usd.format(total);
+  var tier=document.getElementById('svTier'); if(tier) tier.textContent = TIER[state.mode] || '';
+  var bd=document.getElementById('svBreakdown');
+  if(bd){
+    var rows=[];
+    GROUPS.forEach(function(g){
+      var s=0; RATES.filter(function(r){return r.group===g;}).forEach(function(r){ s+=lineCost(r); });
+      if(s>0.005) rows.push('<div class="sv-brow"><span class="k">'+esc(g)+'</span><span class="v">'+usd.format(s)+'</span></div>');
+    });
+    var wv=waivedApplied();
+    if(wv>0.005) rows.push('<div class="sv-brow waived"><span class="k">Waived</span><span class="v">\u2212'+usd.format(wv)+'</span></div>');
+    if(state.budget!=null && state.budget>0){
+      var rem=state.budget-total;
+      rows.push('<div class="sv-brow budget"><span class="k">Budget '+usd.format(state.budget)+'</span><span class="v">'+(rem<0?('over '+usd.format(-rem)):(usd.format(rem)+' left'))+'</span></div>');
+    }
+    bd.innerHTML = rows.join('');
+  }
+  svSub(total>0.005 ? 'Saved on this card \u00b7 tap "Open" to edit.' : 'No charges yet \u00b7 tap "Open" to begin.');
+}
 
 function initConnector(){
   window.TrelloPowerUp.initialize({
@@ -1212,7 +1293,7 @@ function initConnector(){
       return {
         title: 'Recharge Tracker · v' + VERSION,
         icon: TRELLO_ICON,
-        content: { type:'iframe', url: SELF + '?view=summary&v=' + VERSION, height: 122 },
+        content: { type:'iframe', url: SELF + '?view=summary&v=' + VERSION, height: 150 },
         action: { text: 'Open', callback: function(tt){
           return tt.modal({ url: SELF + '?view=editor&v=' + VERSION, fullscreen: true, title: 'Recharge Details', accentColor: '#0c66e4' });
         } }
@@ -1238,30 +1319,22 @@ function applyTheme(t){
 }
 function initSummary(){
   var t = window.TrelloPowerUp.iframe();
-  window._t = t;
+  _t = window._t = t;
   applyTheme(t);
-  var btn = document.getElementById('svEdit');
-  if(btn) btn.addEventListener('click', function(){
-    svSub('Opening editor…');
-    try{
-      var r = t.modal({ url: SELF + '?view=editor&v=' + VERSION, fullscreen: true, title: 'Recharge Details', accentColor: '#0c66e4' });
-      if(r && typeof r.then==='function'){ r.then(function(){ svSub('Click below to enter recharge details.'); },
-        function(err){ svSub('Could not open: ' + (err&&err.message?err.message:String(err))); }); }
-    }catch(e){ svSub('Error: ' + (e&&e.message?e.message:String(e))); }
-    setTimeout(function(){ var s=document.getElementById('svSub');
-      if(s && s.textContent==='Opening editor…'){ s.textContent='No response — use the "Open" link next to the title above.'; } }, 2500);
-  });
   t.render(function(){
     applyTheme(t);
-    var tot=document.getElementById('svTotal'); if(tot) tot.textContent='$0.00';
-    var sub=document.getElementById('svSub'); if(sub) sub.textContent='Click below to enter recharge details.';
-    return t.sizeTo('#summaryView');
+    var finish=function(){ renderSummary(); return t.sizeTo('#summaryView'); };
+    try{
+      var p = t.get('card','shared','rt');
+      if(p && p.then){ return p.then(function(d){ hydrateState(d); return finish(); }, finish); }
+    }catch(e){}
+    return finish();
   });
 }
 
 function initEditor(){
-  try{ window._t = window.TrelloPowerUp.iframe(); }catch(e){}
-  initFullApp();                               // Upload 1: full tool runs in-memory, no load/save yet
+  try{ _t = window._t = window.TrelloPowerUp.iframe(); }catch(e){ _t=null; }
+  loadCard(function(){ initFullApp(); });   // hydrate from saved card data, then build
 }
 
 function boot(){
