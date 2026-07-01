@@ -1200,7 +1200,7 @@ $('#setRestore').onclick=restoreDefaults;
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '0.4';                                         // bump every build so we can confirm deploys
+var VERSION = '0.5';                                         // bump every build so we can confirm deploys
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
 
@@ -1212,7 +1212,10 @@ function initConnector(){
       return {
         title: 'Recharge Tracker · v' + VERSION,
         icon: TRELLO_ICON,
-        content: { type:'iframe', url: SELF + '?view=summary&v=' + VERSION, height: 122 }
+        content: { type:'iframe', url: SELF + '?view=summary&v=' + VERSION, height: 122 },
+        action: { text: 'Open', callback: function(tt){
+          return tt.modal({ url: SELF + '?view=editor&v=' + VERSION, fullscreen: true, title: 'Recharge Details', accentColor: '#0c66e4' });
+        } }
       };
     }
   });
@@ -1245,6 +1248,8 @@ function initSummary(){
       if(r && typeof r.then==='function'){ r.then(function(){ svSub('Click below to enter recharge details.'); },
         function(err){ svSub('Could not open: ' + (err&&err.message?err.message:String(err))); }); }
     }catch(e){ svSub('Error: ' + (e&&e.message?e.message:String(e))); }
+    setTimeout(function(){ var s=document.getElementById('svSub');
+      if(s && s.textContent==='Opening editor…'){ s.textContent='No response — use the "Open" link next to the title above.'; } }, 2500);
   });
   t.render(function(){
     applyTheme(t);
