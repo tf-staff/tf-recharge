@@ -314,6 +314,9 @@
   .sv-sub{font-size:12px;color:var(--rt-subtle,#626f86);margin:3px 0 10px}
   .sv-btn{appearance:none;border:0;cursor:pointer;background:#0c66e4;color:#fff;font-weight:600;font-size:13px;padding:8px 14px;border-radius:6px}
   .sv-btn:hover{background:#0055cc}
+  .sv-diag{font-size:10px;color:var(--rt-subtle,#8a94a6);margin-top:9px;opacity:.85;font-variant-numeric:tabular-nums}
+  #verBadge{position:fixed;right:7px;bottom:6px;font-size:10px;color:#5b6b7a;opacity:.6;z-index:9;pointer-events:none}
+  body.tp-summary #verBadge,body.tp-connector #verBadge{display:none}
 </style>
 </head>
 <body>
@@ -321,7 +324,9 @@
   <div class="sv-row"><span class="sv-label">Recharge total</span> <b class="sv-total" id="svTotal">—</b></div>
   <div class="sv-sub" id="svSub">Click below to enter recharge details.</div>
   <button type="button" class="sv-btn" id="svEdit">Edit Recharge Details</button>
+  <div class="sv-diag" id="svDiag"></div>
 </div>
+<div id="verBadge"></div>
 <div class="panel">
   <div class="head">
     <span class="title"><span class="dollar">&#x1F4B2;&#xFE0E;</span>Recharge Activity</span>
@@ -1163,6 +1168,7 @@ function rebuildAll(){
 
 /* ----- full-app init (standalone + editor modal) ----- */
 function initFullApp(){
+var vb=document.getElementById('verBadge'); if(vb) vb.textContent='v'+VERSION;
 build(); ensureWaivedKeys(); buildWaivers(); setMode('ucd'); recalc(); renderHist(); renderPrepurchase(); updateBudgetStatus();
 requestAnimationFrame(()=>{ RATES.forEach(r=>{ const ref=refs[r.id]; if(ref&&ref.cost) void ref.cost.offsetWidth; }); });
 $('#modeUcd').onclick=()=>{ if(!locked()) setMode('ucd'); };
@@ -1194,6 +1200,7 @@ $('#setRestore').onclick=restoreDefaults;
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
+var VERSION = '0.4';                                         // bump every build so we can confirm deploys
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
 
@@ -1203,36 +1210,44 @@ function initConnector(){
   window.TrelloPowerUp.initialize({
     'card-back-section': function(t, opts){
       return {
-        title: 'Recharge Tracker',
+        title: 'Recharge Tracker · v' + VERSION,
         icon: TRELLO_ICON,
-        content: { type:'iframe', url: SELF + '?view=summary', height: 96 }
+        content: { type:'iframe', url: SELF + '?view=summary&v=' + VERSION, height: 122 }
       };
     }
   });
 }
 
 function detectTheme(t){
-  try{ var c=t.getContext&&t.getContext(); if(c&&(c.theme==='dark'||c.theme==='light')) return c.theme; }catch(e){}
-  var a=document.documentElement.getAttribute('data-color-mode'); if(a==='dark'||a==='light') return a;
-  try{ if(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches) return 'dark'; }catch(e){}
-  return 'light';
+  try{ var c=t.getContext&&t.getContext(); if(c&&(c.theme==='dark'||c.theme==='light')) return {theme:c.theme,src:'ctx'}; }catch(e){}
+  var a=document.documentElement.getAttribute('data-color-mode'); if(a==='dark'||a==='light') return {theme:a,src:'attr'};
+  try{ if(window.matchMedia){ if(matchMedia('(prefers-color-scheme: light)').matches) return {theme:'light',src:'media'};
+    if(matchMedia('(prefers-color-scheme: dark)').matches) return {theme:'dark',src:'media'}; } }catch(e){}
+  return {theme:'dark',src:'default'};   // no signal -> assume dark (matches this board); avoids a white slab
 }
 function svSub(msg){ var s=document.getElementById('svSub'); if(s) s.textContent=msg; }
+function svDiag(msg){ var s=document.getElementById('svDiag'); if(s) s.textContent=msg; }
+function applyTheme(t){
+  var d = detectTheme(t);
+  document.documentElement.setAttribute('data-color-mode', d.theme);
+  svDiag('v' + VERSION + ' · theme ' + d.theme + ' (' + d.src + ')');
+  return d;
+}
 function initSummary(){
   var t = window.TrelloPowerUp.iframe();
   window._t = t;
-  document.documentElement.setAttribute('data-color-mode', detectTheme(t));
+  applyTheme(t);
   var btn = document.getElementById('svEdit');
   if(btn) btn.addEventListener('click', function(){
     svSub('Opening editor…');
     try{
-      var r = t.modal({ url: SELF + '?view=editor', fullscreen: true, title: 'Recharge Details', accentColor: '#0c66e4' });
+      var r = t.modal({ url: SELF + '?view=editor&v=' + VERSION, fullscreen: true, title: 'Recharge Details', accentColor: '#0c66e4' });
       if(r && typeof r.then==='function'){ r.then(function(){ svSub('Click below to enter recharge details.'); },
         function(err){ svSub('Could not open: ' + (err&&err.message?err.message:String(err))); }); }
     }catch(e){ svSub('Error: ' + (e&&e.message?e.message:String(e))); }
   });
   t.render(function(){
-    document.documentElement.setAttribute('data-color-mode', detectTheme(t));
+    applyTheme(t);
     var tot=document.getElementById('svTotal'); if(tot) tot.textContent='$0.00';
     var sub=document.getElementById('svSub'); if(sub) sub.textContent='Click below to enter recharge details.';
     return t.sizeTo('#summaryView');
