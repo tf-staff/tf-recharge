@@ -1217,7 +1217,7 @@ _ready = true;   // from here on, user edits trigger debounced saveCard()
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '0.8';                                         // bump every build so we can confirm deploys
+var VERSION = '0.9';                                         // bump every build so we can confirm deploys
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1320,21 +1320,27 @@ function initSummary(){
   var t = window.TrelloPowerUp.iframe();
   _t = window._t = t;
   applyTheme(t);
-  t.render(function(){
-    applyTheme(t);
-    var done=function(tag){
-      renderSummary();
-      var dg=document.getElementById('svDiag'); if(dg) dg.textContent = 'v' + VERSION + ' \u00b7 data:' + tag;
-      return t.sizeTo('#summaryView');
-    };
+  var settled = false;
+  var finish = function(tag){
+    if(settled) return; settled = true;
+    renderSummary();
+    var e=document.getElementById('svDiag'); if(e) e.textContent = 'v' + VERSION + ' \u00b7 ' + tag;
+    try{ if(t.sizeTo) t.sizeTo('#summaryView'); }catch(_){}
+  };
+  var tryGet = function(src){
+    if(settled) return;
+    var e=document.getElementById('svDiag'); if(e) e.textContent = 'reading (' + src + ')…';
     try{
       var p = t.get('card','shared','rt');
-      if(p && p.then){ return p.then(
-        function(d){ var ok=hydrateState(d); done(ok ? ('yes n=' + Object.keys((d&&d.qty)||{}).length) : 'empty'); },
-        function(e){ done('err ' + (e&&e.message?e.message:String(e))); }); }
-      else { return done('nopromise'); }
-    }catch(e){ return done('throw ' + (e&&e.message?e.message:String(e))); }
-  });
+      if(p && p.then){
+        p.then(function(d){ finish('data:' + (hydrateState(d) ? ('yes n=' + Object.keys((d&&d.qty)||{}).length) : 'empty') + ' (' + src + ')'); },
+               function(er){ finish('data:err (' + src + ') ' + (er&&er.message?er.message:String(er))); });
+      } else { finish('data:nopromise (' + src + ')'); }
+    }catch(er){ /* swallow — let another path try */ }
+  };
+  try{ t.render(function(){ applyTheme(t); tryGet('render'); }); }catch(err){}   // canonical path
+  setTimeout(function(){ tryGet('t600'); }, 600);                                 // fallback if render never fires
+  setTimeout(function(){ if(!settled) finish('data:timeout'); }, 3500);          // last resort so it never sticks on Loading
 }
 
 function initEditor(){
