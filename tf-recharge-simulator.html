@@ -7,10 +7,10 @@
 <script src="https://p.trellocdn.com/power-up.min.js"></script>
 <style>
   :root{
-    --bg:#1d2125; --panel:#22272b;
-    --subtle:rgba(161,189,217,.08); --subtle-h:rgba(166,197,226,.16);
-    --line:#2c333a; --text:#b6c2cf; --dim:#9fadbc; --dimmer:#8c9bab;
-    --head:#cfd8e3; --blue:#579dff; --green:#4bce97; --flash:rgba(75,206,151,.18);
+    --bg:#242528; --panel:#2b2c2f;
+    --subtle:rgba(255,255,255,.06); --subtle-h:rgba(255,255,255,.12);
+    --line:#46474b; --text:#cecfd2; --dim:#96999e; --dimmer:#85878c;
+    --head:#e2e3e5; --blue:#579dff; --green:#4bce97; --flash:rgba(75,206,151,.18);
   }
   *{box-sizing:border-box}
   html,body{margin:0}
@@ -310,34 +310,25 @@
   body.tp-summary #summaryView{display:block}
   body.tp-summary{overflow-y:auto;overflow-x:hidden}
   .sv-label{font-size:11px;color:var(--rt-subtle,#626f86);text-transform:uppercase;letter-spacing:.04em;font-weight:700}
-  .sv-total{font-size:20px;font-weight:800;color:var(--rt-text,#172b4d);font-variant-numeric:tabular-nums}
-  .fc-top{display:flex;align-items:center;gap:9px}
-  .fc-mode{margin-left:auto;display:flex;border:1px solid var(--rt-line,#3d3f43);border-radius:6px;overflow:hidden}
-  .fc-mode button{appearance:none;border:0;cursor:pointer;font-size:10px;font-weight:700;padding:4px 9px;background:transparent;color:var(--rt-subtle,#8a94a6);text-transform:uppercase;letter-spacing:.03em}
-  .fc-mode button.on{background:#0c66e4;color:#fff}
-  .fc-bud{margin:8px 0 2px}
-  .fc-bbar{height:6px;background:var(--rt-line,#3d3f43);border-radius:999px;overflow:hidden}
+  .sv-total{font-size:20px;font-weight:800;color:var(--rt-text,#cecfd2);font-variant-numeric:tabular-nums}
+  .fc-top{display:flex;align-items:baseline;gap:9px}
+  .fc-budlabel{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--rt-subtle,#96999e);font-variant-numeric:tabular-nums}
+  .fc-bud{margin:7px 0 2px}
+  .fc-bbar{height:6px;background:var(--rt-line,#46474b);border-radius:999px;overflow:hidden}
   .fc-bfill{height:100%;width:0;background:#4bce97;border-radius:999px;transition:width .3s ease}
   .fc-bfill.warn{background:#f5cd47}
   .fc-bfill.over{background:#f87168}
-  .fc-bcap{display:flex;justify-content:space-between;font-size:10.5px;color:var(--rt-subtle,#8a94a6);margin-top:3px;font-variant-numeric:tabular-nums}
+  .fc-bcap{display:flex;justify-content:space-between;font-size:10.5px;color:var(--rt-subtle,#96999e);margin-top:3px;font-variant-numeric:tabular-nums}
   .fc-bcap .over{color:#f87168;font-weight:700}
-  .fc-ghdr{display:flex;justify-content:space-between;align-items:baseline;font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--rt-subtle,#8a94a6);margin:8px 0 1px;font-variant-numeric:tabular-nums}
-  .fc-line{display:flex;align-items:center;gap:6px;padding:2px 0}
-  .fc-name{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;font-weight:600;color:var(--rt-text,#b6c2cf)}
-  .fc-name i{font-style:normal;font-weight:500;font-size:10px;color:var(--rt-subtle,#8a94a6);margin-left:4px}
-  .fc-qty{appearance:none;min-width:32px;text-align:center;font-variant-numeric:tabular-nums;border:1px dashed var(--rt-line,#46474b);background:var(--rt-btn,rgba(255,255,255,.06));color:var(--rt-text,#b6c2cf);border-radius:4px;padding:2px 4px;font-size:11.5px;cursor:pointer}
-  .fc-qty:hover{border-color:#579dff;color:#579dff}
-  .fc-qin{width:48px;font:inherit;font-size:11.5px;padding:1px 3px;border:1px solid #579dff;border-radius:4px;background:transparent;color:var(--rt-text,#b6c2cf)}
-  .fc-add{display:flex;gap:4px;margin-left:auto}
-  .fc-add button{appearance:none;cursor:pointer;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:4px;border:1px solid var(--rt-line,#46474b);background:var(--rt-btn,rgba(255,255,255,.08));color:var(--rt-text,#b6c2cf);font-variant-numeric:tabular-nums}
-  .fc-add button:hover{background:rgba(87,157,255,.14);border-color:#579dff;color:#579dff}
-  .fc-extra{display:flex;justify-content:space-between;font-size:11px;color:var(--rt-subtle,#8a94a6);margin-top:6px}
+  .fc-cols{display:grid;grid-template-columns:1fr 1fr;column-gap:26px;margin-top:8px}
+  .fc-grow{display:flex;justify-content:space-between;align-items:baseline;padding:2px 0;font-size:12px}
+  .fc-grow .k{color:var(--rt-subtle,#96999e);font-weight:600}
+  .fc-grow .v{color:var(--rt-text,#cecfd2);font-variant-numeric:tabular-nums}
+  .fc-extra{display:flex;justify-content:space-between;font-size:11px;color:var(--rt-subtle,#96999e);margin-top:5px}
   .fc-extra .v{font-variant-numeric:tabular-nums}
   .fc-extra.waived .v{color:#4bce97}
-  .sv-foot{display:flex;justify-content:space-between;align-items:baseline;margin-top:7px}
-  .sv-status{font-size:10px;color:var(--rt-subtle,#8a94a6);font-variant-numeric:tabular-nums}
-  .sv-ver{font-size:10px;color:var(--rt-subtle,#8a94a6);opacity:.6;font-variant-numeric:tabular-nums}
+  .sv-foot{display:flex;justify-content:flex-end;margin-top:5px}
+  .sv-ver{font-size:10px;color:var(--rt-subtle,#96999e);opacity:.6;font-variant-numeric:tabular-nums}
   #verBadge{position:fixed;right:7px;bottom:6px;font-size:10px;color:#5b6b7a;opacity:.6;z-index:9;pointer-events:none}
   body.tp-summary #verBadge,body.tp-connector #verBadge{display:none}
 </style>
@@ -345,7 +336,7 @@
 <body>
 <div id="summaryView">
   <div id="svBody"></div>
-  <div class="sv-foot"><span class="sv-status" id="svStatus"></span><span class="sv-ver" id="svVer"></span></div>
+  <div class="sv-foot"><span class="sv-ver" id="svVer"></span></div>
 </div>
 <div id="verBadge"></div>
 <div class="panel">
@@ -1232,7 +1223,7 @@ _ready = true;   // from here on, user edits trigger debounced saveCard()
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '1.5';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '1.6';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1279,77 +1270,48 @@ function loadCard(cb){
   }catch(e){ finish(false); }
 }
 
-/* ----- compact mini-editor shown on the card face ----- */
-function rateLabel(r){
-  var rate = rateOf(r);
-  if(r.kind==='material'){
-    if(r.id==='moth') return '$';
-    return '$' + rate + '/' + (r.unit==='g or ml' ? 'g\u00b7ml' : (r.unit||''));
-  }
-  return '$' + rate + '/hr';
-}
+/* ----- compact read-only summary shown on the card face ----- */
 function renderSummary(){
   var body = document.getElementById('svBody'); if(!body) return;
   var total = netTotal();
+  var groupSub = function(g){
+    return RATES.filter(function(r){ return r.group===g; })
+                .reduce(function(a,r){ return a + lineCost(r); }, 0);
+  };
   var h = '';
-  h += '<div class="fc-top"><span class="sv-label">Recharge total</span><b class="sv-total">' + usd.format(total) + '</b>' +
-       '<span class="fc-mode">' + ['ucd','nonuc'].map(function(m){
-          return '<button type="button" data-mode="' + m + '" class="' + (state.mode===m?'on':'') + '">' + TIER[m] + '</button>';
-       }).join('') + '</span></div>';
+  h += '<div class="fc-top"><b class="sv-total">' + usd.format(total) + '</b>' +
+       '<span class="fc-budlabel">' + (state.budget!=null && state.budget>0 ? ('Budget ' + usd.format(state.budget)) : '') + '</span></div>';
   if(state.budget != null && state.budget > 0){
     var pct = total/state.budget*100, shown = Math.max(0, Math.min(100, pct)), rem = state.budget - total;
     var cls = pct > 100 ? 'over' : (pct > 90 ? 'warn' : '');
     h += '<div class="fc-bud"><div class="fc-bbar"><div class="fc-bfill ' + cls + '" style="width:' + shown.toFixed(1) + '%"></div></div>' +
-         '<div class="fc-bcap"><span>Budget ' + usd.format(state.budget) + '</span><span class="' + (rem<0?'over':'') + '">' +
-         (rem < 0 ? ('Over by ' + usd.format(-rem)) : (usd.format(rem) + ' left \u00b7 ' + Math.round(pct) + '% used')) +
+         '<div class="fc-bcap"><span>' + Math.round(pct) + '% used</span><span class="' + (rem<0?'over':'') + '">' +
+         (rem < 0 ? ('Over by ' + usd.format(-rem)) : (usd.format(rem) + ' remaining')) +
          '</span></div></div>';
   }
-  ['Staff Time','Equipment Time','Materials'].forEach(function(g){
-    var rs = RATES.filter(function(r){ return r.group===g && r.kind!=='prepurchase'; });
-    var sub = rs.reduce(function(a,r){ return a + lineCost(r); }, 0);
-    h += '<div class="fc-ghdr"><span>' + esc(g) + '</span><span>' + usd.format(sub) + '</span></div>';
-    rs.forEach(function(r){
-      var q = state.qty[r.id]||0;
-      h += '<div class="fc-line">' +
-           '<button type="button" class="fc-qty" data-qty="' + r.id + '" title="Tap to type an exact amount">' + fmtQty(q) + '</button>' +
-           '<span class="fc-name" title="' + esc(r.desc||r.name) + '">' + esc(r.name) + '<i>' + rateLabel(r) + '</i></span>' +
-           '<span class="fc-add">' + quickInc(r).map(function(a){
-              return '<button type="button" data-id="' + r.id + '" data-add="' + a + '">+' + (a<1 ? String(a).replace('0.','.') : a) + '</button>';
-           }).join('') + '</span></div>';
-    });
-  });
-  var pp = state.prepurchase || [];
-  if(pp.length){
-    var pr = RATES.filter(function(r){ return r.id==='prepurch'; })[0];
-    var ps = pp.reduce(function(a,e){ return a + (e.amount||0); }, 0) * (pr ? rateOf(pr) : 1);
-    h += '<div class="fc-extra"><span>Supplies \u00b7 pass-thru (' + pp.length + ') \u2014 edit via \u201cOpen\u201d</span><span class="v">' + usd.format(ps) + '</span></div>';
-  }
+  var col = function(groups){
+    return '<div class="fc-col">' + groups.map(function(g){
+      return '<div class="fc-grow"><span class="k">' + esc(g) + '</span><span class="v">' + usd.format(groupSub(g)) + '</span></div>';
+    }).join('') + '</div>';
+  };
+  h += '<div class="fc-cols">' + col(['Staff Time','Equipment Time']) + col(['Materials','Supplies']) + '</div>';
   var wv = waivedApplied();
   if(wv > 0.005) h += '<div class="fc-extra waived"><span>Waived</span><span class="v">\u2212' + usd.format(wv) + '</span></div>';
   body.innerHTML = h;
 }
 
-/* The summary iframe's own Trello channel is dead, so the connector acts as its
-   proxy in BOTH directions: it delivers card data to the face via the URL, and it
-   receives the face's quick-add saves over a same-origin BroadcastChannel and
-   performs the t.set itself. Trello reloads the section after each t.set, which
-   re-invokes the capability below and refreshes the face with the saved data. */
-var _lastCardT = null, _connBC = null;
-
 function estimateFaceHeight(d){
-  /* The face can't call t.sizeTo (dead channel), so the connector sizes the iframe.
-     The mini-editor layout is fixed (all rate lines always shown); only three
-     blocks vary. Base constant tuned via headless render. */
-  var h = 420;   // top row + 3 group headers + 9 rate lines + footer + padding + Trello render slack
+  /* Compact two-column summary. sizeTo (if the channel is alive) and internal
+     scroll remain as correctors, but this estimate should be close on its own. */
+  var h = 118;   // total row + two column rows + version footer + padding + Trello slack
   try{
     if(d && typeof d === 'object'){
-      if(typeof d.budget === 'number' && d.budget > 0) h += 38;                       // progress bar + caption
-      if(Array.isArray(d.pp) && d.pp.length) h += 24;                                 // supplies pass-thru row
+      if(typeof d.budget === 'number' && d.budget > 0) h += 36;   // progress bar + caption
       var wvAny = d.waived && Object.keys(d.waived).some(function(k){ return d.waived[k] > 0; });
-      if((d.wt || d.wm) && wvAny) h += 24;                                            // waived row
+      if((d.wt || d.wm) && wvAny) h += 20;                        // waived row
     }
   }catch(e){}
-  return Math.min(560, h);
+  return Math.min(200, h);
 }
 
 function initConnector(){
@@ -1378,7 +1340,7 @@ function initConnector(){
           icon: TRELLO_ICON,
           content: { type:'iframe', url: url, height: estimateFaceHeight(d) },
           action: { text: 'Open', callback: function(tt){
-            return tt.modal({ url: SELF + '?view=editor&cb=' + Date.now(), fullscreen: false, height: 1240, title: 'Recharge Details', accentColor: '#0c66e4' });
+            return tt.modal({ url: SELF + '?view=editor&cb=' + Date.now(), fullscreen: false, height: 1500, title: 'Recharge Details', accentColor: '#242528' });
           } }
         };
       };
@@ -1396,85 +1358,10 @@ function detectTheme(t){
   var a=document.documentElement.getAttribute('data-color-mode'); if(a==='dark'||a==='light') return {theme:a,src:'attr'};
   return {theme:'dark',src:'default'};   /* assume dark; Trello sets data-color-mode shortly and we re-apply */
 }
-function svStatus(msg){ var s=document.getElementById('svStatus'); if(s) s.textContent=msg; }
 function applyTheme(t){
   var d = detectTheme(t);
   document.documentElement.setAttribute('data-color-mode', d.theme);
   return d;
-}
-
-/* ----- quick-add on the card face (saves relayed through the connector) ----- */
-var _faceTimer=null, _faceAckTimer=null, _faceBC=null;
-function faceChannel(){
-  if(_faceBC) return _faceBC;
-  try{
-    _faceBC = new BroadcastChannel('tf-rt');
-    _faceBC.onmessage = function(m){
-      var msg = m && m.data;
-      if(!msg) return;
-      if(msg.type==='saved'){ clearTimeout(_faceAckTimer); svStatus('Saved'); }
-      else if(msg.type==='saveerr'){ clearTimeout(_faceAckTimer); svStatus('Save failed \u2014 use \u201cOpen\u201d'); }
-    };
-  }catch(e){}
-  return _faceBC;
-}
-function scheduleFaceSave(){
-  svStatus('Saving\u2026');
-  clearTimeout(_faceTimer);
-  _faceTimer = setTimeout(function(){
-    var bc = faceChannel();
-    if(!bc){ svStatus('Save failed \u2014 use \u201cOpen\u201d'); return; }
-    try{ bc.postMessage({ type:'save', data: serializeState() }); }
-    catch(e){ svStatus('Save failed \u2014 use \u201cOpen\u201d'); return; }
-    clearTimeout(_faceAckTimer);
-    _faceAckTimer = setTimeout(function(){ svStatus('Save not confirmed \u2014 verify via \u201cOpen\u201d'); }, 4000);
-  }, 1200);
-}
-function initFaceUI(){
-  var body = document.getElementById('svBody'); if(!body) return;
-  body.addEventListener('click', function(ev){
-    var el = ev.target; if(!el || !el.closest) return;
-    var mb = el.closest('.fc-mode button');
-    if(mb && mb.dataset.mode){
-      if(state.mode !== mb.dataset.mode){ state.mode = mb.dataset.mode; renderSummary(); scheduleFaceSave(); }
-      return;
-    }
-    var ab = el.closest('.fc-add button');
-    if(ab && ab.dataset.id){
-      var add = parseFloat(ab.dataset.add);
-      if(isFinite(add)){
-        state.qty[ab.dataset.id] = Math.round(((state.qty[ab.dataset.id]||0) + add) * 100) / 100;
-        renderSummary(); scheduleFaceSave();
-      }
-      return;
-    }
-    var qb = el.closest('.fc-qty');
-    if(qb && qb.dataset.qty) beginQtyEdit(qb);
-  });
-}
-function beginQtyEdit(btn){
-  var id = btn.dataset.qty;
-  var inp = document.createElement('input');
-  inp.type='number'; inp.step='0.25'; inp.min='0'; inp.className='fc-qin';
-  inp.value = state.qty[id] || 0;
-  btn.replaceWith(inp); inp.focus(); inp.select();
-  var closed = false;
-  var done = function(commit){
-    if(closed) return; closed = true;
-    if(commit){
-      var v = parseFloat(inp.value);
-      if(isFinite(v) && v >= 0 && v !== (state.qty[id]||0)){
-        state.qty[id] = Math.round(v*100)/100;
-        scheduleFaceSave();
-      }
-    }
-    renderSummary();
-  };
-  inp.addEventListener('keydown', function(e){
-    if(e.key==='Enter') done(true);
-    else if(e.key==='Escape') done(false);
-  });
-  inp.addEventListener('blur', function(){ done(true); });
 }
 
 function initSummary(){
@@ -1483,8 +1370,6 @@ function initSummary(){
   applyTheme(t);
   [150,500,1200,2500].forEach(function(ms){ setTimeout(function(){ applyTheme(t); }, ms); });   // catch late theme attr
   var vb = document.getElementById('svVer'); if(vb) vb.textContent = 'v' + VERSION;
-  initFaceUI();
-  faceChannel();   // open the relay early so acks aren't missed
   var settled = false;
   var finish = function(){
     if(settled) return; settled = true;
