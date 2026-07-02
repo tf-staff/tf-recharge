@@ -21,10 +21,13 @@
   input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
   input[type=number]{-moz-appearance:textfield}
 
-  .panel{max-width:540px; margin:0 auto; background:var(--panel); position:relative;
-    border:1px solid var(--line); border-radius:10px; padding:12px 12px 10px;}
+  .panel{max-width:690px; margin:0 auto; background:var(--panel); position:relative;
+    border:none; border-radius:10px; padding:12px 18px 10px;}
 
   .head{display:flex; align-items:center; gap:10px; margin-bottom:4px}
+  .savechip{font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;border:1px solid var(--line);color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .savechip.ok{color:var(--green);border-color:rgba(75,206,151,.45)}
+  .savechip.err{color:#f87168;border-color:rgba(248,113,104,.45)}
   .title{display:inline-flex; align-items:center; gap:7px; font-weight:700; font-size:14px; color:var(--head)}
   .title .dollar{font-size:15px; line-height:1; color:var(--text)}
   .seg{display:inline-flex; background:var(--subtle); border-radius:6px; padding:2px; gap:2px}
@@ -320,6 +323,7 @@
   .fc-bfill.over{background:#f87168}
   .fc-bcap{display:flex;justify-content:space-between;font-size:10.5px;color:var(--rt-subtle,#96999e);margin-top:3px;font-variant-numeric:tabular-nums}
   .fc-bcap .over{color:#f87168;font-weight:700}
+  .fc-empty{font-size:12.5px;color:var(--rt-subtle,#96999e);padding:5px 0 2px}
   .fc-cols{display:grid;grid-template-columns:1fr 1fr;column-gap:22px;align-items:start;margin-top:2px}
   .fc-ghdr{display:flex;gap:9px;align-items:baseline;font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--rt-subtle,#96999e);margin:8px 0 2px;font-variant-numeric:tabular-nums}
   .fc-ghdr .v{color:var(--rt-text,#cecfd2)}
@@ -345,6 +349,7 @@
 <div class="panel">
   <div class="head">
     <span class="title"><span class="dollar">&#x1F4B2;&#xFE0E;</span>Recharge Activity</span>
+    <span class="savechip" id="saveChip" hidden></span>
     <div class="head-right">
       <button class="qenter" id="qEnter">Generate Quote</button>
       <div class="seg" role="group" aria-label="Rate tier">
@@ -1226,7 +1231,7 @@ _ready = true;   // from here on, user edits trigger debounced saveCard()
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '1.8';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '1.9';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1256,13 +1261,40 @@ function hydrateState(d){
   state.quoteBase = (d.qbase && typeof d.qbase==='object') ? d.qbase : {};
   return true;
 }
+var SAVE_DELAY = 3000, _chipTimer = null;
+function saveChip(txt, cls){
+  var c = document.getElementById('saveChip'); if(!c) return;
+  if(!txt){ c.hidden = true; return; }
+  c.hidden = false; c.textContent = txt; c.className = 'savechip' + (cls ? ' ' + cls : '');
+}
+function saveNow(){
+  if(!_t) return;
+  clearTimeout(_saveTimer); _saveTimer = null;
+  clearInterval(_chipTimer); _chipTimer = null;
+  try{
+    var p = _t.set('card','shared','rt', serializeState());
+    saveChip('Saving\u2026');
+    if(p && p.then){
+      p.then(function(){ saveChip('Saved \u2713','ok'); setTimeout(function(){ saveChip(''); }, 2500); },
+             function(){ saveChip('Save failed','err'); });
+    } else { saveChip('Saved \u2713','ok'); setTimeout(function(){ saveChip(''); }, 2500); }
+  }catch(e){ saveChip('Save failed','err'); }
+}
 function saveCard(){
   if(!_ready || !_t) return;
-  clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(function(){
-    try{ _t.set('card','shared','rt', serializeState()); }catch(e){}
-  }, 1200);
+  clearTimeout(_saveTimer); clearInterval(_chipTimer);
+  var left = Math.ceil(SAVE_DELAY/1000);
+  saveChip('Saving in ' + left + '\u2026');
+  _chipTimer = setInterval(function(){ left--; if(left > 0) saveChip('Saving in ' + left + '\u2026'); }, 1000);
+  _saveTimer = setTimeout(saveNow, SAVE_DELAY);
 }
+/* Never lose a pending save when the modal closes or the tab hides */
+['pagehide','beforeunload'].forEach(function(ev){
+  window.addEventListener(ev, function(){ if(_saveTimer) saveNow(); });
+});
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState === 'hidden' && _saveTimer) saveNow();
+});
 function loadCard(cb){
   if(!_t){ cb && cb(false); return; }
   var done=false, finish=function(ok){ if(done) return; done=true; cb && cb(ok); };
@@ -1276,6 +1308,9 @@ function loadCard(cb){
 /* ----- compact read-only summary shown on the card face ----- */
 function renderSummary(){
   var body = document.getElementById('svBody'); if(!body) return;
+  var anyQty = RATES.some(function(r){ return (state.qty[r.id]||0) > 0; });
+  var isEmpty = !anyQty && !(state.prepurchase||[]).length && !(state.budget != null && state.budget > 0);
+  if(isEmpty){ body.innerHTML = '<div class="fc-empty">No current recharge details</div>'; return; }
   var total = netTotal();
   var groupSub = function(g){
     return RATES.filter(function(r){ return r.group===g; })
@@ -1327,8 +1362,15 @@ function estimateFaceHeight(d){
   /* Two itemized columns. Left column (2+4 lines) is fixed; right column
      (3 material lines + supply orders) grows with pp entries.
      sizeTo (if alive) and internal scroll remain as correctors. */
-  var pp = 0;
-  try{ if(d && Array.isArray(d.pp)) pp = d.pp.length; }catch(e){}
+  var pp = 0, empty = true;
+  try{
+    if(d && typeof d === 'object'){
+      if(Array.isArray(d.pp)){ pp = d.pp.length; if(pp) empty = false; }
+      if(d.qty && Object.keys(d.qty).some(function(k){ return d.qty[k] > 0; })) empty = false;
+      if(typeof d.budget === 'number' && d.budget > 0) empty = false;
+    }
+  }catch(e){}
+  if(empty) return 78;
   var left = 2*22 + 6*23;                 // 2 headers + 6 lines
   var right = 2*22 + (3 + pp)*23;         // 2 headers + 3 material lines + orders
   var h = 92 + Math.max(left, right);     // top row + footer + padding + Trello slack
