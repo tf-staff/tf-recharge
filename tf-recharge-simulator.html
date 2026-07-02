@@ -306,27 +306,38 @@
   body.tp-connector{background:transparent;margin:0;padding:0}
   body.tp-summary .panel,body.tp-connector .panel{display:none}
   body.tp-connector #summaryView{display:none}
-  #summaryView{display:none;padding:2px 2px 4px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  #summaryView{display:none;padding:2px 4px 4px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
   body.tp-summary #summaryView{display:block}
-  .sv-row{display:flex;align-items:baseline;gap:8px}
+  body.tp-summary{overflow:hidden}
   .sv-label{font-size:11px;color:var(--rt-subtle,#626f86);text-transform:uppercase;letter-spacing:.04em;font-weight:700}
   .sv-total{font-size:20px;font-weight:800;color:var(--rt-text,#172b4d);font-variant-numeric:tabular-nums}
-  .sv-sub{font-size:12px;color:var(--rt-subtle,#626f86);margin:3px 0 10px}
-  .sv-btn{appearance:none;border:0;cursor:pointer;background:#0c66e4;color:#fff;font-weight:600;font-size:13px;padding:8px 14px;border-radius:6px}
-  .sv-btn:hover{background:#0055cc}
-  .sv-tier{font-size:11px;font-weight:700;color:var(--rt-subtle,#8a94a6);text-transform:uppercase;letter-spacing:.04em}
-  .sv-breakdown{margin:9px 0 3px;display:flex;flex-direction:column;gap:2px}
-  .sv-brow{display:flex;justify-content:space-between;font-size:12px;color:var(--rt-text,#172b4d);font-variant-numeric:tabular-nums}
-  .sv-brow .k{color:var(--rt-subtle,#8a94a6)}
-  .sv-brow.waived .v{color:#4bce97}
-  .sv-brow.budget .k,.sv-brow.budget .v{font-size:11px}
-  body.tp-summary{overflow:hidden}
-  .sv-quick{display:flex;align-items:center;gap:6px;margin:8px 0 2px;flex-wrap:nowrap;white-space:nowrap}
-  .sv-quick .ql{font-size:11px;font-weight:700;color:var(--rt-subtle,#8a94a6);margin-right:1px}
-  .sv-quick .ql+.ql{margin-left:10px}
-  .sv-quick button{appearance:none;cursor:pointer;font-size:11px;font-weight:600;padding:3px 8px;border-radius:4px;border:1px solid var(--rt-line,#3d3f43);background:transparent;color:var(--rt-text,#b6c2cf);font-variant-numeric:tabular-nums}
-  .sv-quick button:hover{background:rgba(87,157,255,.14);border-color:#579dff;color:#579dff}
-  .sv-foot{display:flex;justify-content:space-between;align-items:baseline;margin-top:8px}
+  .fc-top{display:flex;align-items:center;gap:9px}
+  .fc-mode{margin-left:auto;display:flex;border:1px solid var(--rt-line,#3d3f43);border-radius:6px;overflow:hidden}
+  .fc-mode button{appearance:none;border:0;cursor:pointer;font-size:10px;font-weight:700;padding:4px 9px;background:transparent;color:var(--rt-subtle,#8a94a6);text-transform:uppercase;letter-spacing:.03em}
+  .fc-mode button.on{background:#0c66e4;color:#fff}
+  .fc-bud{margin:8px 0 2px}
+  .fc-bbar{height:6px;background:var(--rt-line,#3d3f43);border-radius:999px;overflow:hidden}
+  .fc-bfill{height:100%;width:0;background:#4bce97;border-radius:999px;transition:width .3s ease}
+  .fc-bfill.warn{background:#f5cd47}
+  .fc-bfill.over{background:#f87168}
+  .fc-bcap{display:flex;justify-content:space-between;font-size:10.5px;color:var(--rt-subtle,#8a94a6);margin-top:3px;font-variant-numeric:tabular-nums}
+  .fc-bcap .over{color:#f87168;font-weight:700}
+  .fc-ghdr{display:flex;justify-content:space-between;align-items:baseline;font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--rt-subtle,#8a94a6);margin:8px 0 1px;font-variant-numeric:tabular-nums}
+  .fc-line{display:flex;align-items:center;gap:6px;padding:2px 0}
+  .fc-name{flex:0 0 122px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;font-weight:600;color:var(--rt-text,#b6c2cf)}
+  .fc-name i{font-style:normal;font-weight:500;font-size:10px;color:var(--rt-subtle,#8a94a6);margin-left:4px}
+  .fc-qty{appearance:none;min-width:32px;text-align:center;font-variant-numeric:tabular-nums;border:1px dashed var(--rt-line,#3d3f43);background:transparent;color:var(--rt-text,#b6c2cf);border-radius:4px;padding:2px 4px;font-size:11.5px;cursor:pointer}
+  .fc-qty:hover{border-color:#579dff;color:#579dff}
+  .fc-qin{width:48px;font:inherit;font-size:11.5px;padding:1px 3px;border:1px solid #579dff;border-radius:4px;background:transparent;color:var(--rt-text,#b6c2cf)}
+  .fc-add{display:flex;gap:4px}
+  .fc-add button{appearance:none;cursor:pointer;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:4px;border:1px solid var(--rt-line,#3d3f43);background:transparent;color:var(--rt-text,#b6c2cf);font-variant-numeric:tabular-nums}
+  .fc-add button:hover{background:rgba(87,157,255,.14);border-color:#579dff;color:#579dff}
+  .fc-cost{margin-left:auto;font-size:11.5px;color:var(--rt-text,#b6c2cf);font-variant-numeric:tabular-nums}
+  .fc-cost.zero{color:var(--rt-subtle,#8a94a6);opacity:.75}
+  .fc-extra{display:flex;justify-content:space-between;font-size:11px;color:var(--rt-subtle,#8a94a6);margin-top:6px}
+  .fc-extra .v{font-variant-numeric:tabular-nums}
+  .fc-extra.waived .v{color:#4bce97}
+  .sv-foot{display:flex;justify-content:space-between;align-items:baseline;margin-top:7px}
   .sv-status{font-size:10px;color:var(--rt-subtle,#8a94a6);font-variant-numeric:tabular-nums}
   .sv-ver{font-size:10px;color:var(--rt-subtle,#8a94a6);opacity:.6;font-variant-numeric:tabular-nums}
   #verBadge{position:fixed;right:7px;bottom:6px;font-size:10px;color:#5b6b7a;opacity:.6;z-index:9;pointer-events:none}
@@ -335,10 +346,7 @@
 </head>
 <body>
 <div id="summaryView">
-  <div class="sv-row"><span class="sv-label">Recharge total</span> <b class="sv-total" id="svTotal">—</b> <span class="sv-tier" id="svTier"></span></div>
-  <div class="sv-breakdown" id="svBreakdown"></div>
-  <div class="sv-quick" id="svQuick"></div>
-  <div class="sv-sub" id="svSub">Loading…</div>
+  <div id="svBody"></div>
   <div class="sv-foot"><span class="sv-status" id="svStatus"></span><span class="sv-ver" id="svVer"></span></div>
 </div>
 <div id="verBadge"></div>
@@ -1226,7 +1234,7 @@ _ready = true;   // from here on, user edits trigger debounced saveCard()
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '1.2';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '1.3';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1273,27 +1281,54 @@ function loadCard(cb){
   }catch(e){ finish(false); }
 }
 
-/* ----- compact read-only summary shown on the card face ----- */
-function renderSummary(){
-  var total = netTotal();
-  var tot=document.getElementById('svTotal'); if(tot) tot.textContent=usd.format(total);
-  var tier=document.getElementById('svTier'); if(tier) tier.textContent = TIER[state.mode] || '';
-  var bd=document.getElementById('svBreakdown');
-  if(bd){
-    var rows=[];
-    GROUPS.forEach(function(g){
-      var s=0; RATES.filter(function(r){return r.group===g;}).forEach(function(r){ s+=lineCost(r); });
-      if(s>0.005) rows.push('<div class="sv-brow"><span class="k">'+esc(g)+'</span><span class="v">'+usd.format(s)+'</span></div>');
-    });
-    var wv=waivedApplied();
-    if(wv>0.005) rows.push('<div class="sv-brow waived"><span class="k">Waived</span><span class="v">\u2212'+usd.format(wv)+'</span></div>');
-    if(state.budget!=null && state.budget>0){
-      var rem=state.budget-total;
-      rows.push('<div class="sv-brow budget"><span class="k">Budget '+usd.format(state.budget)+'</span><span class="v">'+(rem<0?('over '+usd.format(-rem)):(usd.format(rem)+' left'))+'</span></div>');
-    }
-    bd.innerHTML = rows.join('');
+/* ----- compact mini-editor shown on the card face ----- */
+function rateLabel(r){
+  var rate = rateOf(r);
+  if(r.kind==='material'){
+    if(r.id==='moth') return '$';
+    return '$' + rate + '/' + (r.unit==='g or ml' ? 'g\u00b7ml' : (r.unit||''));
   }
-  svSub(total>0.005 ? 'Saved on this card \u00b7 tap "Open" to edit.' : 'No charges yet \u00b7 tap "Open" to begin.');
+  return '$' + rate + '/hr';
+}
+function renderSummary(){
+  var body = document.getElementById('svBody'); if(!body) return;
+  var total = netTotal();
+  var h = '';
+  h += '<div class="fc-top"><span class="sv-label">Recharge total</span><b class="sv-total">' + usd.format(total) + '</b>' +
+       '<span class="fc-mode">' + ['ucd','nonuc'].map(function(m){
+          return '<button type="button" data-mode="' + m + '" class="' + (state.mode===m?'on':'') + '">' + TIER[m] + '</button>';
+       }).join('') + '</span></div>';
+  if(state.budget != null && state.budget > 0){
+    var pct = total/state.budget*100, shown = Math.max(0, Math.min(100, pct)), rem = state.budget - total;
+    var cls = pct > 100 ? 'over' : (pct > 90 ? 'warn' : '');
+    h += '<div class="fc-bud"><div class="fc-bbar"><div class="fc-bfill ' + cls + '" style="width:' + shown.toFixed(1) + '%"></div></div>' +
+         '<div class="fc-bcap"><span>Budget ' + usd.format(state.budget) + '</span><span class="' + (rem<0?'over':'') + '">' +
+         (rem < 0 ? ('Over by ' + usd.format(-rem)) : (usd.format(rem) + ' left \u00b7 ' + Math.round(pct) + '% used')) +
+         '</span></div></div>';
+  }
+  ['Staff Time','Equipment Time','Materials'].forEach(function(g){
+    var rs = RATES.filter(function(r){ return r.group===g && r.kind!=='prepurchase'; });
+    var sub = rs.reduce(function(a,r){ return a + lineCost(r); }, 0);
+    h += '<div class="fc-ghdr"><span>' + esc(g) + '</span><span>' + usd.format(sub) + '</span></div>';
+    rs.forEach(function(r){
+      var q = state.qty[r.id]||0, c = lineCost(r);
+      h += '<div class="fc-line"><span class="fc-name" title="' + esc(r.desc||r.name) + '">' + esc(r.name) + '<i>' + rateLabel(r) + '</i></span>' +
+           '<button type="button" class="fc-qty" data-qty="' + r.id + '" title="Tap to type an exact amount">' + fmtQty(q) + '</button>' +
+           '<span class="fc-add">' + quickInc(r).map(function(a){
+              return '<button type="button" data-id="' + r.id + '" data-add="' + a + '">+' + (a<1 ? String(a).replace('0.','.') : a) + '</button>';
+           }).join('') + '</span>' +
+           '<span class="fc-cost' + (c>0.005?'':' zero') + '">' + usd.format(c) + '</span></div>';
+    });
+  });
+  var pp = state.prepurchase || [];
+  if(pp.length){
+    var pr = RATES.filter(function(r){ return r.id==='prepurch'; })[0];
+    var ps = pp.reduce(function(a,e){ return a + (e.amount||0); }, 0) * (pr ? rateOf(pr) : 1);
+    h += '<div class="fc-extra"><span>Supplies \u00b7 pass-thru (' + pp.length + ') \u2014 edit via \u201cOpen\u201d</span><span class="v">' + usd.format(ps) + '</span></div>';
+  }
+  var wv = waivedApplied();
+  if(wv > 0.005) h += '<div class="fc-extra waived"><span>Waived</span><span class="v">\u2212' + usd.format(wv) + '</span></div>';
+  body.innerHTML = h;
 }
 
 /* The summary iframe's own Trello channel is dead, so the connector acts as its
@@ -1304,25 +1339,19 @@ function renderSummary(){
 var _lastCardT = null, _connBC = null;
 
 function estimateFaceHeight(d){
-  /* The face can't call t.sizeTo (dead channel), so the connector sizes the iframe
-     from the data it is about to hand over. Constants tuned via headless render. */
-  var rows = 0;
+  /* The face can't call t.sizeTo (dead channel), so the connector sizes the iframe.
+     The mini-editor layout is fixed (all rate lines always shown); only three
+     blocks vary. Base constant tuned via headless render. */
+  var h = 345;   // top row + 3 group headers + 9 rate lines + footer + padding
   try{
     if(d && typeof d === 'object'){
-      GROUPS.forEach(function(g){
-        var has = false;
-        RATES.filter(function(r){ return r.group===g; }).forEach(function(r){
-          var q = d.qty && d.qty[r.id];
-          if(typeof q === 'number' && q > 0) has = true;
-          if(r.id === 'prepurch' && Array.isArray(d.pp) && d.pp.length) has = true;
-        });
-        if(has) rows++;
-      });
-      if(d.wt || d.wm) rows++;                                   // possible waived row
-      if(typeof d.budget === 'number' && d.budget > 0) rows++;   // budget row
+      if(typeof d.budget === 'number' && d.budget > 0) h += 34;                       // progress bar + caption
+      if(Array.isArray(d.pp) && d.pp.length) h += 20;                                 // supplies pass-thru row
+      var wvAny = d.waived && Object.keys(d.waived).some(function(k){ return d.waived[k] > 0; });
+      if((d.wt || d.wm) && wvAny) h += 20;                                            // waived row
     }
   }catch(e){}
-  return Math.min(260, 150 + rows*18);
+  return Math.min(440, h);
 }
 
 function initConnector(){
@@ -1368,7 +1397,6 @@ function detectTheme(t){
   var a=document.documentElement.getAttribute('data-color-mode'); if(a==='dark'||a==='light') return {theme:a,src:'attr'};
   return {theme:'dark',src:'default'};   /* assume dark; Trello sets data-color-mode shortly and we re-apply */
 }
-function svSub(msg){ var s=document.getElementById('svSub'); if(s) s.textContent=msg; }
 function svStatus(msg){ var s=document.getElementById('svStatus'); if(s) s.textContent=msg; }
 function applyTheme(t){
   var d = detectTheme(t);
@@ -1403,24 +1431,51 @@ function scheduleFaceSave(){
     _faceAckTimer = setTimeout(function(){ svStatus('Save not confirmed \u2014 verify via \u201cOpen\u201d'); }, 4000);
   }, 1200);
 }
-function initSummaryQuick(){
-  var q = document.getElementById('svQuick'); if(!q) return;
-  var mk = function(id,label){
-    return '<span class="ql">'+label+'</span>' +
-      [0.25,0.5,1].map(function(a){
-        return '<button type="button" data-id="'+id+'" data-add="'+a+'">+'+(a===1?'1':String(a).replace('0.','.'))+'</button>';
-      }).join('');
-  };
-  q.innerHTML = mk('eng','Eng') + mk('tech','Tech');
-  q.addEventListener('click', function(ev){
-    var b = ev.target && ev.target.closest ? ev.target.closest('button') : null;
-    if(!b || !b.dataset.id) return;
-    var id = b.dataset.id, add = parseFloat(b.dataset.add);
-    if(!isFinite(add)) return;
-    state.qty[id] = Math.round(((state.qty[id]||0) + add) * 100) / 100;
-    renderSummary();
-    scheduleFaceSave();
+function initFaceUI(){
+  var body = document.getElementById('svBody'); if(!body) return;
+  body.addEventListener('click', function(ev){
+    var el = ev.target; if(!el || !el.closest) return;
+    var mb = el.closest('.fc-mode button');
+    if(mb && mb.dataset.mode){
+      if(state.mode !== mb.dataset.mode){ state.mode = mb.dataset.mode; renderSummary(); scheduleFaceSave(); }
+      return;
+    }
+    var ab = el.closest('.fc-add button');
+    if(ab && ab.dataset.id){
+      var add = parseFloat(ab.dataset.add);
+      if(isFinite(add)){
+        state.qty[ab.dataset.id] = Math.round(((state.qty[ab.dataset.id]||0) + add) * 100) / 100;
+        renderSummary(); scheduleFaceSave();
+      }
+      return;
+    }
+    var qb = el.closest('.fc-qty');
+    if(qb && qb.dataset.qty) beginQtyEdit(qb);
   });
+}
+function beginQtyEdit(btn){
+  var id = btn.dataset.qty;
+  var inp = document.createElement('input');
+  inp.type='number'; inp.step='0.25'; inp.min='0'; inp.className='fc-qin';
+  inp.value = state.qty[id] || 0;
+  btn.replaceWith(inp); inp.focus(); inp.select();
+  var closed = false;
+  var done = function(commit){
+    if(closed) return; closed = true;
+    if(commit){
+      var v = parseFloat(inp.value);
+      if(isFinite(v) && v >= 0 && v !== (state.qty[id]||0)){
+        state.qty[id] = Math.round(v*100)/100;
+        scheduleFaceSave();
+      }
+    }
+    renderSummary();
+  };
+  inp.addEventListener('keydown', function(e){
+    if(e.key==='Enter') done(true);
+    else if(e.key==='Escape') done(false);
+  });
+  inp.addEventListener('blur', function(){ done(true); });
 }
 
 function initSummary(){
@@ -1429,7 +1484,7 @@ function initSummary(){
   applyTheme(t);
   [150,500,1200,2500].forEach(function(ms){ setTimeout(function(){ applyTheme(t); }, ms); });   // catch late theme attr
   var vb = document.getElementById('svVer'); if(vb) vb.textContent = 'v' + VERSION;
-  initSummaryQuick();
+  initFaceUI();
   faceChannel();   // open the relay early so acks aren't missed
   var settled = false;
   var finish = function(){
