@@ -299,8 +299,8 @@
   .set-quick{width:92px; text-align:left; font-size:11.5px !important}
   /* ===== Trello Power-Up: summary view (shown on the card back) ===== */
   /* Trello sets data-color-mode="light|dark" on <html>; adapt to both themes. */
-  html[data-color-mode="light"]{--rt-bg:#ffffff;--rt-text:#172b4d;--rt-subtle:#626f86}
-  html[data-color-mode="dark"]{--rt-bg:#242528;--rt-text:#b6c2cf;--rt-subtle:#9fadbc}
+  html[data-color-mode="light"]{--rt-bg:#ffffff;--rt-text:#292a2e;--rt-subtle:#6b6e76;--rt-line:#dcdfe4;--rt-btn:rgba(0,0,0,.05)}
+  html[data-color-mode="dark"]{--rt-bg:#242528;--rt-text:#cecfd2;--rt-subtle:#96999e;--rt-line:#46474b;--rt-btn:rgba(255,255,255,.08)}
   html{background:transparent}
   body.tp-summary{background:var(--rt-bg,transparent);margin:0;padding:0}
   body.tp-connector{background:transparent;margin:0;padding:0}
@@ -324,16 +324,14 @@
   .fc-bcap .over{color:#f87168;font-weight:700}
   .fc-ghdr{display:flex;justify-content:space-between;align-items:baseline;font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--rt-subtle,#8a94a6);margin:8px 0 1px;font-variant-numeric:tabular-nums}
   .fc-line{display:flex;align-items:center;gap:6px;padding:2px 0}
-  .fc-name{flex:0 0 122px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;font-weight:600;color:var(--rt-text,#b6c2cf)}
+  .fc-name{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;font-weight:600;color:var(--rt-text,#b6c2cf)}
   .fc-name i{font-style:normal;font-weight:500;font-size:10px;color:var(--rt-subtle,#8a94a6);margin-left:4px}
-  .fc-qty{appearance:none;min-width:32px;text-align:center;font-variant-numeric:tabular-nums;border:1px dashed var(--rt-line,#3d3f43);background:transparent;color:var(--rt-text,#b6c2cf);border-radius:4px;padding:2px 4px;font-size:11.5px;cursor:pointer}
+  .fc-qty{appearance:none;min-width:32px;text-align:center;font-variant-numeric:tabular-nums;border:1px dashed var(--rt-line,#46474b);background:var(--rt-btn,rgba(255,255,255,.06));color:var(--rt-text,#b6c2cf);border-radius:4px;padding:2px 4px;font-size:11.5px;cursor:pointer}
   .fc-qty:hover{border-color:#579dff;color:#579dff}
   .fc-qin{width:48px;font:inherit;font-size:11.5px;padding:1px 3px;border:1px solid #579dff;border-radius:4px;background:transparent;color:var(--rt-text,#b6c2cf)}
-  .fc-add{display:flex;gap:4px}
-  .fc-add button{appearance:none;cursor:pointer;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:4px;border:1px solid var(--rt-line,#3d3f43);background:transparent;color:var(--rt-text,#b6c2cf);font-variant-numeric:tabular-nums}
+  .fc-add{display:flex;gap:4px;margin-left:auto}
+  .fc-add button{appearance:none;cursor:pointer;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:4px;border:1px solid var(--rt-line,#46474b);background:var(--rt-btn,rgba(255,255,255,.08));color:var(--rt-text,#b6c2cf);font-variant-numeric:tabular-nums}
   .fc-add button:hover{background:rgba(87,157,255,.14);border-color:#579dff;color:#579dff}
-  .fc-cost{margin-left:auto;font-size:11.5px;color:var(--rt-text,#b6c2cf);font-variant-numeric:tabular-nums}
-  .fc-cost.zero{color:var(--rt-subtle,#8a94a6);opacity:.75}
   .fc-extra{display:flex;justify-content:space-between;font-size:11px;color:var(--rt-subtle,#8a94a6);margin-top:6px}
   .fc-extra .v{font-variant-numeric:tabular-nums}
   .fc-extra.waived .v{color:#4bce97}
@@ -1234,7 +1232,7 @@ _ready = true;   // from here on, user edits trigger debounced saveCard()
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '1.3';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '1.4';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1311,13 +1309,13 @@ function renderSummary(){
     var sub = rs.reduce(function(a,r){ return a + lineCost(r); }, 0);
     h += '<div class="fc-ghdr"><span>' + esc(g) + '</span><span>' + usd.format(sub) + '</span></div>';
     rs.forEach(function(r){
-      var q = state.qty[r.id]||0, c = lineCost(r);
-      h += '<div class="fc-line"><span class="fc-name" title="' + esc(r.desc||r.name) + '">' + esc(r.name) + '<i>' + rateLabel(r) + '</i></span>' +
+      var q = state.qty[r.id]||0;
+      h += '<div class="fc-line">' +
            '<button type="button" class="fc-qty" data-qty="' + r.id + '" title="Tap to type an exact amount">' + fmtQty(q) + '</button>' +
+           '<span class="fc-name" title="' + esc(r.desc||r.name) + '">' + esc(r.name) + '<i>' + rateLabel(r) + '</i></span>' +
            '<span class="fc-add">' + quickInc(r).map(function(a){
               return '<button type="button" data-id="' + r.id + '" data-add="' + a + '">+' + (a<1 ? String(a).replace('0.','.') : a) + '</button>';
-           }).join('') + '</span>' +
-           '<span class="fc-cost' + (c>0.005?'':' zero') + '">' + usd.format(c) + '</span></div>';
+           }).join('') + '</span></div>';
     });
   });
   var pp = state.prepurchase || [];
@@ -1342,16 +1340,16 @@ function estimateFaceHeight(d){
   /* The face can't call t.sizeTo (dead channel), so the connector sizes the iframe.
      The mini-editor layout is fixed (all rate lines always shown); only three
      blocks vary. Base constant tuned via headless render. */
-  var h = 345;   // top row + 3 group headers + 9 rate lines + footer + padding
+  var h = 420;   // top row + 3 group headers + 9 rate lines + footer + padding + Trello render slack
   try{
     if(d && typeof d === 'object'){
-      if(typeof d.budget === 'number' && d.budget > 0) h += 34;                       // progress bar + caption
-      if(Array.isArray(d.pp) && d.pp.length) h += 20;                                 // supplies pass-thru row
+      if(typeof d.budget === 'number' && d.budget > 0) h += 38;                       // progress bar + caption
+      if(Array.isArray(d.pp) && d.pp.length) h += 24;                                 // supplies pass-thru row
       var wvAny = d.waived && Object.keys(d.waived).some(function(k){ return d.waived[k] > 0; });
-      if((d.wt || d.wm) && wvAny) h += 20;                                            // waived row
+      if((d.wt || d.wm) && wvAny) h += 24;                                            // waived row
     }
   }catch(e){}
-  return Math.min(440, h);
+  return Math.min(560, h);
 }
 
 function initConnector(){
