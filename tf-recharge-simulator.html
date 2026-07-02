@@ -1232,7 +1232,7 @@ _ready = true;   // from here on, user edits trigger debounced saveCard()
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '2.1';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '2.2';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1246,7 +1246,7 @@ function serializeState(){
   return { v:1, mode:state.mode, qty:state.qty, pp:state.prepurchase,
     budget:state.budget, bstat:state.budgetStatus,
     wt:state.waiveTime, wm:state.waiveMat, waived:state.waived,
-    quoted:state.quoted, qbase:state.quoteBase };
+    quoted:state.quoted, qbase:state.quoteBase, bimp:!!state.budgetImported };
 }
 function hydrateState(d){
   if(!d || typeof d!=='object') return false;
@@ -1260,6 +1260,7 @@ function hydrateState(d){
   state.waived = (d.waived && typeof d.waived==='object') ? d.waived : {};
   state.quoted = (d.quoted && typeof d.quoted==='object') ? d.quoted : {};
   state.quoteBase = (d.qbase && typeof d.qbase==='object') ? d.qbase : {};
+  state.budgetImported = !!d.bimp;
   return true;
 }
 var SAVE_DELAY = 800, _edBC = null;
@@ -1391,6 +1392,40 @@ function renderSummary(){
   body.innerHTML = h;
 }
 
+/* ----- budget auto-import from the card description (JotForm intake format) -----
+   Field looks like:  "Max Budget: $ 10000 Target Completion Date ..." — may be blank
+   ("Max Budget: $ Target Completion Date ...", must NOT match the date digits) and
+   users sometimes type their own $ ("Max Budget: $ $900"). Only whitespace and $
+   may sit between the label and the digits, which blocks the date fall-through. */
+function parseBudgetFromDesc(desc){
+  if(!desc || typeof desc !== 'string') return null;
+  var m = desc.match(/Max\s+Budget\s*:?\s*\$?\s*\$?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)/i);
+  if(!m) return null;
+  var v = parseFloat(m[1].replace(/,/g,''));
+  if(!isFinite(v) || v <= 0 || v > 10000000) return null;
+  return Math.round(v*100)/100;
+}
+function maybeImportBudget(t, dataStr){
+  /* Returns a promise resolving to the (possibly updated) dataStr. Never rejects. */
+  var d = null; try{ d = dataStr ? JSON.parse(dataStr) : null; }catch(e){}
+  var hasBudget = d && typeof d.budget === 'number' && d.budget > 0;
+  if(hasBudget || (d && d.bimp)) return Promise.resolve(dataStr);
+  return t.card('desc').then(function(card){
+    var v = parseBudgetFromDesc(card && card.desc);
+    if(v == null){ return dataStr; }
+    var nd = d || { v:1, mode:'ucd', qty:{}, pp:[], budget:null, bstat:'undefined',
+                    wt:false, wm:false, waived:{}, quoted:{}, qbase:{} };
+    nd.budget = v; nd.bstat = 'approved'; nd.bimp = true;
+    var hist = [{ t:Date.now(), note:true, name:'Budget imported from card description', detail: usd.format(v) }];
+    return t.get('card','shared','rt_h').then(function(hOld){
+      if(Array.isArray(hOld)) hist = hist.concat(hOld).slice(0,40);
+      return t.set('card','shared',{ rt: nd, rt_h: hist }).then(function(){ return JSON.stringify(nd); });
+    }).catch(function(){
+      return t.set('card','shared',{ rt: nd, rt_h: hist }).then(function(){ return JSON.stringify(nd); });
+    });
+  }).catch(function(){ return dataStr; });
+}
+
 function estimateFaceHeight(d){
   /* Two itemized columns. Left column (2+4 lines) is fixed; right column
      (3 material lines + supply orders) grows with pp entries.
@@ -1451,7 +1486,9 @@ function initConnector(){
         .then(function(d){ return d ? JSON.stringify(d) : ''; })
         .catch(function(){ return ''; });
       var timeout = new Promise(function(res){ setTimeout(function(){ res(''); }, 1500); });
-      return Promise.race([read, timeout]).then(buildSection);
+      return Promise.race([read, timeout])
+        .then(function(dataStr){ return maybeImportBudget(t, dataStr); })
+        .then(buildSection);
     }
   });
 }
