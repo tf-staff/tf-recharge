@@ -1217,7 +1217,7 @@ _ready = true;   // from here on, user edits trigger debounced saveCard()
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '0.9';                                         // bump every build so we can confirm deploys
+var VERSION = '1.0';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1291,11 +1291,11 @@ function initConnector(){
   window.TrelloPowerUp.initialize({
     'card-back-section': function(t, opts){
       return {
-        title: 'Recharge · v' + VERSION,
+        title: 'Recharge',
         icon: TRELLO_ICON,
-        content: { type:'iframe', url: SELF + '?view=summary&v=' + VERSION, height: 150 },
+        content: { type:'iframe', url: SELF + '?view=summary&cb=' + Date.now(), height: 150 },
         action: { text: 'Open', callback: function(tt){
-          return tt.modal({ url: SELF + '?view=editor&v=' + VERSION, fullscreen: false, height: 900, title: 'Recharge Details', accentColor: '#0c66e4' });
+          return tt.modal({ url: SELF + '?view=editor&cb=' + Date.now(), fullscreen: false, height: 900, title: 'Recharge Details', accentColor: '#0c66e4' });
         } }
       };
     }
@@ -1305,9 +1305,7 @@ function initConnector(){
 function detectTheme(t){
   try{ var c=t.getContext&&t.getContext(); if(c&&(c.theme==='dark'||c.theme==='light')) return {theme:c.theme,src:'ctx'}; }catch(e){}
   var a=document.documentElement.getAttribute('data-color-mode'); if(a==='dark'||a==='light') return {theme:a,src:'attr'};
-  try{ if(window.matchMedia){ if(matchMedia('(prefers-color-scheme: light)').matches) return {theme:'light',src:'media'};
-    if(matchMedia('(prefers-color-scheme: dark)').matches) return {theme:'dark',src:'media'}; } }catch(e){}
-  return {theme:'dark',src:'default'};   // no signal -> assume dark (matches this board); avoids a white slab
+  return {theme:'dark',src:'default'};   /* assume dark; Trello sets data-color-mode shortly and we re-apply */
 }
 function svSub(msg){ var s=document.getElementById('svSub'); if(s) s.textContent=msg; }
 function svDiag(msg){ var s=document.getElementById('svDiag'); if(s) s.textContent=msg; }
@@ -1320,10 +1318,11 @@ function initSummary(){
   var t = window.TrelloPowerUp.iframe();
   _t = window._t = t;
   applyTheme(t);
+  [150,500,1200,2500].forEach(function(ms){ setTimeout(function(){ applyTheme(t); }, ms); });   // catch late theme attr
   var settled = false;
   var finish = function(tag){
     if(settled) return; settled = true;
-    renderSummary();
+    applyTheme(t); renderSummary();
     var e=document.getElementById('svDiag'); if(e) e.textContent = 'v' + VERSION + ' \u00b7 ' + tag;
     try{ if(t.sizeTo) t.sizeTo('#summaryView'); }catch(_){}
   };
