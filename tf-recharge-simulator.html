@@ -50,7 +50,7 @@
   .nmrate .desc:empty{display:none}
   .qcell{flex:0 0 auto; min-width:34px; display:flex; flex-direction:column; align-items:flex-end}
   .qtop{display:flex; justify-content:flex-end; align-items:center}
-  .qty{font-size:13px; color:var(--dim)}
+  .qty{font-size:12.5px; color:var(--text); border:1px solid var(--line); background:var(--subtle); border-radius:5px; padding:2px 8px; min-width:34px; display:inline-block; text-align:center; font-variant-numeric:tabular-nums}
   .qedit{width:58px; font:inherit; font-size:12.5px; text-align:right; padding:3px 6px;
     color:var(--text); background:var(--bg); border:1px solid var(--blue); border-radius:5px}
   .cost{flex:0 0 54px; text-align:right; font-size:13px; font-weight:600; border-radius:4px; padding:2px 0}
@@ -828,7 +828,7 @@ function updateBudgetStatus(){ const sel=$('#budgetStatus'); if(!sel) return; se
   const bi=$('#budgetInput'); if(bi) bi.disabled=lk;
   const wc=$('#waiveChk'), wm=$('#waiveMatChk'); if(wc) wc.disabled=lk; if(wm) wm.disabled=lk;
 }
-function setBudgetStatus(v){ state.budgetStatus=v; updateBudgetStatus(); }
+function setBudgetStatus(v){ state.budgetStatus=v; updateBudgetStatus(); saveCard(); }
 function updateBudget(){
   const b=state.budget, total=netTotal();
   const remEl=$('#bremain'), fill=$('#bfill');
@@ -1029,7 +1029,7 @@ async function saveQuote(deltaOnly){
   }});
   state.quoted=nq; state.quoteBase=nb;
   if(s) applySnapshot(s, false);                 // revert entries to pre-quote state
-  if(total>0){ state.budget=total; } else if(s){ state.budget=s.budget; }   // budget = the summarized total
+  if(total>0){ state.budget=Math.round(total*100)/100; } else if(s){ state.budget=(s.budget!=null?Math.round(s.budget*100)/100:s.budget); }   // budget = the summarized total, to the penny
   state.budgetStatus='calculated'; updateBudgetStatus();
   const bi=$('#budgetInput'); if(bi) bi.value=(state.budget!=null && state.budget>0)?Number(state.budget).toFixed(2):'';
   state.history.unshift({t:Date.now(), note:true, name: deltaOnly?'New charges quoted':'Client quote saved', detail:`${usd.format(total)} \u2192 budget`, mode:state.mode});
@@ -1097,6 +1097,7 @@ function resetAll(){
   document.querySelectorAll('#list .min, #waivedList .min, #waivedMatList .min').forEach(i=>i.value='');
   const bi=$('#budgetInput'); if(bi) bi.value='';
   RATES.forEach(r=>updateRow(r.id,false)); updateWaivedRows(); recalc(); renderHist(); renderPrepurchase();
+  saveNow();   // resets are destructive: persist immediately, never ride the debounce
 }
 
 /* ----- settings (editable structure) ----- */
@@ -1203,7 +1204,7 @@ build(); ensureWaivedKeys(); buildWaivers(); setMode(state.mode); syncInputsFrom
 requestAnimationFrame(()=>{ RATES.forEach(r=>{ const ref=refs[r.id]; if(ref&&ref.cost) void ref.cost.offsetWidth; }); });
 $('#modeUcd').onclick=()=>{ if(!locked()) setMode('ucd'); };
 $('#modeNon').onclick=()=>{ if(!locked()) setMode('nonuc'); };
-$('#budgetInput').addEventListener('input',e=>{ const v=parseFloat(e.target.value.replace(/[^0-9.]/g,'')); state.budget=isNaN(v)?null:v; updateBudget(); });
+$('#budgetInput').addEventListener('input',e=>{ const v=parseFloat(e.target.value.replace(/[^0-9.]/g,'')); state.budget=isNaN(v)?null:v; updateBudget(); saveCard(); });
 $('#budgetStatus').addEventListener('change',e=>setBudgetStatus(e.target.value));
 $('#waiveChk').addEventListener('change',e=>{ state.waiveTime=e.target.checked; $('#waived').classList.toggle('hidden', !state.waiveTime); recalc(); });
 $('#waiveMatChk').addEventListener('change',e=>{ state.waiveMat=e.target.checked; $('#waivedMat').classList.toggle('hidden', !state.waiveMat); recalc(); });
@@ -1231,7 +1232,7 @@ _ready = true;   // from here on, user edits trigger debounced saveCard()
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '2.0';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '2.1';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1442,7 +1443,7 @@ function initConnector(){
           icon: TRELLO_ICON,
           content: { type:'iframe', url: url, height: estimateFaceHeight(d) },
           action: { text: 'Open', callback: function(tt){
-            return tt.modal({ url: SELF + '?view=editor&cb=' + Date.now(), fullscreen: false, height: 1100, title: '', accentColor: '#242528' });
+            return tt.modal({ url: SELF + '?view=editor&cb=' + Date.now(), fullscreen: false, height: 1300, title: '', accentColor: '#242528' });
           } }
         };
       };
@@ -1504,6 +1505,7 @@ function initSummary(){
 
 function initEditor(){
   try{ _t = window._t = window.TrelloPowerUp.iframe(); }catch(e){ _t=null; }
+  setTimeout(function(){ try{ document.body.setAttribute('tabindex','-1'); document.body.focus({preventScroll:true}); }catch(e){} }, 120);   // pull focus off Trello's modal X (kills the blue ring)
   loadCard(function(){ initFullApp(); });   // hydrate from saved card data, then build
 }
 
