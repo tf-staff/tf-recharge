@@ -320,10 +320,13 @@
   .fc-bfill.over{background:#f87168}
   .fc-bcap{display:flex;justify-content:space-between;font-size:10.5px;color:var(--rt-subtle,#96999e);margin-top:3px;font-variant-numeric:tabular-nums}
   .fc-bcap .over{color:#f87168;font-weight:700}
-  .fc-cols{display:grid;grid-template-columns:1fr 1fr;column-gap:26px;margin-top:8px}
-  .fc-grow{display:flex;justify-content:space-between;align-items:baseline;padding:2px 0;font-size:12px}
-  .fc-grow .k{color:var(--rt-subtle,#96999e);font-weight:600}
-  .fc-grow .v{color:var(--rt-text,#cecfd2);font-variant-numeric:tabular-nums}
+  .fc-cols{display:grid;grid-template-columns:1fr 1fr;column-gap:22px;align-items:start;margin-top:2px}
+  .fc-ghdr{display:flex;gap:9px;align-items:baseline;font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--rt-subtle,#96999e);margin:8px 0 2px;font-variant-numeric:tabular-nums}
+  .fc-ghdr .v{color:var(--rt-text,#cecfd2)}
+  .fc-line{display:flex;align-items:center;gap:7px;padding:1.5px 0}
+  .fc-qbox{min-width:26px;text-align:center;font-size:11px;font-variant-numeric:tabular-nums;border:1px solid var(--rt-line,#46474b);background:var(--rt-btn,rgba(255,255,255,.06));color:var(--rt-text,#cecfd2);border-radius:4px;padding:1.5px 4px}
+  .fc-name{font-size:12px;font-weight:600;color:var(--rt-text,#cecfd2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fc-name i{font-style:normal;font-weight:500;font-size:10px;color:var(--rt-subtle,#96999e);margin-left:4px}
   .fc-extra{display:flex;justify-content:space-between;font-size:11px;color:var(--rt-subtle,#96999e);margin-top:5px}
   .fc-extra .v{font-variant-numeric:tabular-nums}
   .fc-extra.waived .v{color:#4bce97}
@@ -1223,7 +1226,7 @@ _ready = true;   // from here on, user edits trigger debounced saveCard()
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '1.6';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '1.8';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1289,29 +1292,54 @@ function renderSummary(){
          (rem < 0 ? ('Over by ' + usd.format(-rem)) : (usd.format(rem) + ' remaining')) +
          '</span></div></div>';
   }
-  var col = function(groups){
-    return '<div class="fc-col">' + groups.map(function(g){
-      return '<div class="fc-grow"><span class="k">' + esc(g) + '</span><span class="v">' + usd.format(groupSub(g)) + '</span></div>';
-    }).join('') + '</div>';
+  var rateLabel = function(r){
+    var rate = rateOf(r);
+    if(r.kind==='material'){
+      if(r.id==='moth') return '$';
+      return '$' + rate + '/' + (r.unit==='g or ml' ? 'g\u00b7ml' : (r.unit||''));
+    }
+    return '$' + rate + '/hr';
   };
-  h += '<div class="fc-cols">' + col(['Staff Time','Equipment Time']) + col(['Materials','Supplies']) + '</div>';
+  var group = function(g){
+    var out = '<div class="fc-ghdr"><span>' + esc(g) + '</span><span class="v">' + usd.format(groupSub(g)) + '</span></div>';
+    RATES.filter(function(r){ return r.group===g && r.kind!=='prepurchase'; }).forEach(function(r){
+      out += '<div class="fc-line"><span class="fc-qbox">' + fmtQty(state.qty[r.id]||0) + '</span>' +
+             '<span class="fc-name">' + esc(r.name) + '<i>' + rateLabel(r) + '</i></span></div>';
+    });
+    if(g==='Supplies'){
+      (state.prepurchase||[]).forEach(function(e, i){
+        out += '<div class="fc-line"><span class="fc-qbox">' + (i+1) + '</span>' +
+               '<span class="fc-name">' + esc(e.id || 'Order ' + (i+1)) + '<i>' + usd.format(e.amount||0) + '</i></span></div>';
+      });
+    }
+    return out;
+  };
+  h += '<div class="fc-cols">' +
+       '<div class="fc-col">' + group('Staff Time') + group('Equipment Time') + '</div>' +
+       '<div class="fc-col">' + group('Materials') + group('Supplies') + '</div>' +
+       '</div>';
   var wv = waivedApplied();
   if(wv > 0.005) h += '<div class="fc-extra waived"><span>Waived</span><span class="v">\u2212' + usd.format(wv) + '</span></div>';
   body.innerHTML = h;
 }
 
 function estimateFaceHeight(d){
-  /* Compact two-column summary. sizeTo (if the channel is alive) and internal
-     scroll remain as correctors, but this estimate should be close on its own. */
-  var h = 118;   // total row + two column rows + version footer + padding + Trello slack
+  /* Two itemized columns. Left column (2+4 lines) is fixed; right column
+     (3 material lines + supply orders) grows with pp entries.
+     sizeTo (if alive) and internal scroll remain as correctors. */
+  var pp = 0;
+  try{ if(d && Array.isArray(d.pp)) pp = d.pp.length; }catch(e){}
+  var left = 2*22 + 6*23;                 // 2 headers + 6 lines
+  var right = 2*22 + (3 + pp)*23;         // 2 headers + 3 material lines + orders
+  var h = 92 + Math.max(left, right);     // top row + footer + padding + Trello slack
   try{
     if(d && typeof d === 'object'){
-      if(typeof d.budget === 'number' && d.budget > 0) h += 36;   // progress bar + caption
+      if(typeof d.budget === 'number' && d.budget > 0) h += 36;
       var wvAny = d.waived && Object.keys(d.waived).some(function(k){ return d.waived[k] > 0; });
-      if((d.wt || d.wm) && wvAny) h += 20;                        // waived row
+      if((d.wt || d.wm) && wvAny) h += 20;
     }
   }catch(e){}
-  return Math.min(200, h);
+  return Math.min(560, h);
 }
 
 function initConnector(){
