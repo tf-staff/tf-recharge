@@ -1231,7 +1231,7 @@ _ready = true;   // from here on, user edits trigger debounced saveCard()
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '1.9';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '2.0';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1261,18 +1261,34 @@ function hydrateState(d){
   state.quoteBase = (d.qbase && typeof d.qbase==='object') ? d.qbase : {};
   return true;
 }
-var SAVE_DELAY = 3000, _chipTimer = null;
+var SAVE_DELAY = 800, _edBC = null;
 function saveChip(txt, cls){
   var c = document.getElementById('saveChip'); if(!c) return;
   if(!txt){ c.hidden = true; return; }
   c.hidden = false; c.textContent = txt; c.className = 'savechip' + (cls ? ' ' + cls : '');
 }
+/* Compact, byte-budgeted history for persistence (Trello caps card data at 4096 chars total).
+   Snapshots are stripped; the list itself survives close/reopen. */
+function serializeHist(){
+  var out = [], size = 2;
+  for(var i=0; i<state.history.length && out.length<40; i++){
+    var e = state.history[i];
+    var c = { t:e.t, name:e.name, kind:e.kind, delta:e.delta, mode:e.mode,
+              source:e.source, note:e.note, reset:e.reset, quote:e.quote, detail:e.detail };
+    Object.keys(c).forEach(function(k){ if(c[k]===undefined) delete c[k]; });
+    var js = JSON.stringify(c);
+    if(size + js.length + 1 > 2300) break;
+    size += js.length + 1;
+    out.push(c);
+  }
+  return out;
+}
+function savePayload(){ return { rt: serializeState(), rt_h: serializeHist() }; }
 function saveNow(){
   if(!_t) return;
   clearTimeout(_saveTimer); _saveTimer = null;
-  clearInterval(_chipTimer); _chipTimer = null;
   try{
-    var p = _t.set('card','shared','rt', serializeState());
+    var p = _t.set('card','shared', savePayload());
     saveChip('Saving\u2026');
     if(p && p.then){
       p.then(function(){ saveChip('Saved \u2713','ok'); setTimeout(function(){ saveChip(''); }, 2500); },
@@ -1282,25 +1298,41 @@ function saveNow(){
 }
 function saveCard(){
   if(!_ready || !_t) return;
-  clearTimeout(_saveTimer); clearInterval(_chipTimer);
-  var left = Math.ceil(SAVE_DELAY/1000);
-  saveChip('Saving in ' + left + '\u2026');
-  _chipTimer = setInterval(function(){ left--; if(left > 0) saveChip('Saving in ' + left + '\u2026'); }, 1000);
+  clearTimeout(_saveTimer);
+  saveChip('Saving\u2026');
   _saveTimer = setTimeout(saveNow, SAVE_DELAY);
 }
-/* Never lose a pending save when the modal closes or the tab hides */
+/* Close-proof saving: on any sign the modal is going away, fire the direct save
+   AND hand a copy to the connector over BroadcastChannel — the connector outlives
+   this iframe and performs the same t.set from safety. Duplicate writes are
+   idempotent (same payload), so both paths may land harmlessly. */
+function relayFlush(){
+  try{
+    if(!_edBC) _edBC = new BroadcastChannel('tf-rt');
+    _edBC.postMessage({ type:'save', data: savePayload() });
+  }catch(e){}
+}
 ['pagehide','beforeunload'].forEach(function(ev){
-  window.addEventListener(ev, function(){ if(_saveTimer) saveNow(); });
+  window.addEventListener(ev, function(){ if(_saveTimer){ relayFlush(); saveNow(); } });
 });
 document.addEventListener('visibilitychange', function(){
-  if(document.visibilityState === 'hidden' && _saveTimer) saveNow();
+  if(document.visibilityState === 'hidden' && _saveTimer){ relayFlush(); saveNow(); }
 });
 function loadCard(cb){
   if(!_t){ cb && cb(false); return; }
   var done=false, finish=function(ok){ if(done) return; done=true; cb && cb(ok); };
   try{
-    var p = _t.get('card','shared','rt');
-    if(p && p.then){ p.then(function(d){ finish(hydrateState(d)); }, function(){ finish(false); }); }
+    var pd = _t.get('card','shared','rt');
+    var ph = _t.get('card','shared','rt_h');
+    if(pd && pd.then){
+      Promise.all([
+        pd.catch(function(){ return null; }),
+        (ph && ph.then) ? ph.catch(function(){ return null; }) : Promise.resolve(null)
+      ]).then(function(res){
+        if(Array.isArray(res[1])) state.history = res[1];
+        finish(hydrateState(res[0]));
+      }, function(){ finish(false); });
+    }
     else finish(false);
   }catch(e){ finish(false); }
 }
@@ -1391,7 +1423,7 @@ function initConnector(){
       var msg = m && m.data;
       if(!msg || msg.type !== 'save' || !_lastCardT) return;
       try{
-        _lastCardT.set('card','shared','rt', msg.data).then(
+        _lastCardT.set('card','shared', msg.data).then(
           function(){ try{ _connBC.postMessage({type:'saved'}); }catch(e){} },
           function(){ try{ _connBC.postMessage({type:'saveerr'}); }catch(e){} }
         );
@@ -1410,7 +1442,7 @@ function initConnector(){
           icon: TRELLO_ICON,
           content: { type:'iframe', url: url, height: estimateFaceHeight(d) },
           action: { text: 'Open', callback: function(tt){
-            return tt.modal({ url: SELF + '?view=editor&cb=' + Date.now(), fullscreen: false, height: 1500, title: 'Recharge Details', accentColor: '#242528' });
+            return tt.modal({ url: SELF + '?view=editor&cb=' + Date.now(), fullscreen: false, height: 1100, title: '', accentColor: '#242528' });
           } }
         };
       };
