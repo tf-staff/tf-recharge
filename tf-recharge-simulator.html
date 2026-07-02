@@ -320,7 +320,15 @@
   .sv-brow .k{color:var(--rt-subtle,#8a94a6)}
   .sv-brow.waived .v{color:#4bce97}
   .sv-brow.budget .k,.sv-brow.budget .v{font-size:11px}
-  .sv-diag{font-size:10px;color:var(--rt-subtle,#8a94a6);margin-top:9px;opacity:.85;font-variant-numeric:tabular-nums}
+  body.tp-summary{overflow:hidden}
+  .sv-quick{display:flex;align-items:center;gap:6px;margin:8px 0 2px;flex-wrap:nowrap;white-space:nowrap}
+  .sv-quick .ql{font-size:11px;font-weight:700;color:var(--rt-subtle,#8a94a6);margin-right:1px}
+  .sv-quick .ql+.ql{margin-left:10px}
+  .sv-quick button{appearance:none;cursor:pointer;font-size:11px;font-weight:600;padding:3px 8px;border-radius:4px;border:1px solid var(--rt-line,#3d3f43);background:transparent;color:var(--rt-text,#b6c2cf);font-variant-numeric:tabular-nums}
+  .sv-quick button:hover{background:rgba(87,157,255,.14);border-color:#579dff;color:#579dff}
+  .sv-foot{display:flex;justify-content:space-between;align-items:baseline;margin-top:8px}
+  .sv-status{font-size:10px;color:var(--rt-subtle,#8a94a6);font-variant-numeric:tabular-nums}
+  .sv-ver{font-size:10px;color:var(--rt-subtle,#8a94a6);opacity:.6;font-variant-numeric:tabular-nums}
   #verBadge{position:fixed;right:7px;bottom:6px;font-size:10px;color:#5b6b7a;opacity:.6;z-index:9;pointer-events:none}
   body.tp-summary #verBadge,body.tp-connector #verBadge{display:none}
 </style>
@@ -329,8 +337,9 @@
 <div id="summaryView">
   <div class="sv-row"><span class="sv-label">Recharge total</span> <b class="sv-total" id="svTotal">—</b> <span class="sv-tier" id="svTier"></span></div>
   <div class="sv-breakdown" id="svBreakdown"></div>
+  <div class="sv-quick" id="svQuick"></div>
   <div class="sv-sub" id="svSub">Loading…</div>
-  <div class="sv-diag" id="svDiag">(no render)</div>
+  <div class="sv-foot"><span class="sv-status" id="svStatus"></span><span class="sv-ver" id="svVer"></span></div>
 </div>
 <div id="verBadge"></div>
 <div class="panel">
@@ -1217,7 +1226,7 @@ _ready = true;   // from here on, user edits trigger debounced saveCard()
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '1.1';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '1.2';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1287,21 +1296,61 @@ function renderSummary(){
   svSub(total>0.005 ? 'Saved on this card \u00b7 tap "Open" to edit.' : 'No charges yet \u00b7 tap "Open" to begin.');
 }
 
+/* The summary iframe's own Trello channel is dead, so the connector acts as its
+   proxy in BOTH directions: it delivers card data to the face via the URL, and it
+   receives the face's quick-add saves over a same-origin BroadcastChannel and
+   performs the t.set itself. Trello reloads the section after each t.set, which
+   re-invokes the capability below and refreshes the face with the saved data. */
+var _lastCardT = null, _connBC = null;
+
+function estimateFaceHeight(d){
+  /* The face can't call t.sizeTo (dead channel), so the connector sizes the iframe
+     from the data it is about to hand over. Constants tuned via headless render. */
+  var rows = 0;
+  try{
+    if(d && typeof d === 'object'){
+      GROUPS.forEach(function(g){
+        var has = false;
+        RATES.filter(function(r){ return r.group===g; }).forEach(function(r){
+          var q = d.qty && d.qty[r.id];
+          if(typeof q === 'number' && q > 0) has = true;
+          if(r.id === 'prepurch' && Array.isArray(d.pp) && d.pp.length) has = true;
+        });
+        if(has) rows++;
+      });
+      if(d.wt || d.wm) rows++;                                   // possible waived row
+      if(typeof d.budget === 'number' && d.budget > 0) rows++;   // budget row
+    }
+  }catch(e){}
+  return Math.min(260, 150 + rows*18);
+}
+
 function initConnector(){
+  try{
+    _connBC = new BroadcastChannel('tf-rt');
+    _connBC.onmessage = function(m){
+      var msg = m && m.data;
+      if(!msg || msg.type !== 'save' || !_lastCardT) return;
+      try{
+        _lastCardT.set('card','shared','rt', msg.data).then(
+          function(){ try{ _connBC.postMessage({type:'saved'}); }catch(e){} },
+          function(){ try{ _connBC.postMessage({type:'saveerr'}); }catch(e){} }
+        );
+      }catch(e){ try{ _connBC.postMessage({type:'saveerr'}); }catch(_){}}
+    };
+  }catch(e){}
   window.TrelloPowerUp.initialize({
     'card-back-section': function(t, opts){
-      /* v1.1: the summary iframe's own Trello channel proved dead (data:timeout),
-         but THIS callback's `t` works. So we read the card data here and hand it
-         to the summary inside its URL (`d=` param). Trello re-invokes this callback
-         whenever card data changes, so the face auto-refreshes after editor saves. */
+      _lastCardT = t;   // the currently open card's working handle
       var buildSection = function(dataStr){
+        var d = null; try{ d = dataStr ? JSON.parse(dataStr) : null; }catch(e){}
         var url = SELF + '?view=summary&cb=' + Date.now() + '&d=' + encodeURIComponent(dataStr);
         return {
           title: 'Recharge',
           icon: TRELLO_ICON,
-          content: { type:'iframe', url: url, height: 150 },
+          content: { type:'iframe', url: url, height: estimateFaceHeight(d) },
           action: { text: 'Open', callback: function(tt){
-            return tt.modal({ url: SELF + '?view=editor&cb=' + Date.now(), fullscreen: false, height: 1125, title: 'Recharge Details', accentColor: '#0c66e4' });
+            return tt.modal({ url: SELF + '?view=editor&cb=' + Date.now(), fullscreen: false, height: 1240, title: 'Recharge Details', accentColor: '#0c66e4' });
           } }
         };
       };
@@ -1320,48 +1369,95 @@ function detectTheme(t){
   return {theme:'dark',src:'default'};   /* assume dark; Trello sets data-color-mode shortly and we re-apply */
 }
 function svSub(msg){ var s=document.getElementById('svSub'); if(s) s.textContent=msg; }
-function svDiag(msg){ var s=document.getElementById('svDiag'); if(s) s.textContent=msg; }
+function svStatus(msg){ var s=document.getElementById('svStatus'); if(s) s.textContent=msg; }
 function applyTheme(t){
   var d = detectTheme(t);
   document.documentElement.setAttribute('data-color-mode', d.theme);
   return d;
 }
+
+/* ----- quick-add on the card face (saves relayed through the connector) ----- */
+var _faceTimer=null, _faceAckTimer=null, _faceBC=null;
+function faceChannel(){
+  if(_faceBC) return _faceBC;
+  try{
+    _faceBC = new BroadcastChannel('tf-rt');
+    _faceBC.onmessage = function(m){
+      var msg = m && m.data;
+      if(!msg) return;
+      if(msg.type==='saved'){ clearTimeout(_faceAckTimer); svStatus('Saved'); }
+      else if(msg.type==='saveerr'){ clearTimeout(_faceAckTimer); svStatus('Save failed \u2014 use \u201cOpen\u201d'); }
+    };
+  }catch(e){}
+  return _faceBC;
+}
+function scheduleFaceSave(){
+  svStatus('Saving\u2026');
+  clearTimeout(_faceTimer);
+  _faceTimer = setTimeout(function(){
+    var bc = faceChannel();
+    if(!bc){ svStatus('Save failed \u2014 use \u201cOpen\u201d'); return; }
+    try{ bc.postMessage({ type:'save', data: serializeState() }); }
+    catch(e){ svStatus('Save failed \u2014 use \u201cOpen\u201d'); return; }
+    clearTimeout(_faceAckTimer);
+    _faceAckTimer = setTimeout(function(){ svStatus('Save not confirmed \u2014 verify via \u201cOpen\u201d'); }, 4000);
+  }, 1200);
+}
+function initSummaryQuick(){
+  var q = document.getElementById('svQuick'); if(!q) return;
+  var mk = function(id,label){
+    return '<span class="ql">'+label+'</span>' +
+      [0.25,0.5,1].map(function(a){
+        return '<button type="button" data-id="'+id+'" data-add="'+a+'">+'+(a===1?'1':String(a).replace('0.','.'))+'</button>';
+      }).join('');
+  };
+  q.innerHTML = mk('eng','Eng') + mk('tech','Tech');
+  q.addEventListener('click', function(ev){
+    var b = ev.target && ev.target.closest ? ev.target.closest('button') : null;
+    if(!b || !b.dataset.id) return;
+    var id = b.dataset.id, add = parseFloat(b.dataset.add);
+    if(!isFinite(add)) return;
+    state.qty[id] = Math.round(((state.qty[id]||0) + add) * 100) / 100;
+    renderSummary();
+    scheduleFaceSave();
+  });
+}
+
 function initSummary(){
   var t = window.TrelloPowerUp.iframe();
   _t = window._t = t;
   applyTheme(t);
   [150,500,1200,2500].forEach(function(ms){ setTimeout(function(){ applyTheme(t); }, ms); });   // catch late theme attr
+  var vb = document.getElementById('svVer'); if(vb) vb.textContent = 'v' + VERSION;
+  initSummaryQuick();
+  faceChannel();   // open the relay early so acks aren't missed
   var settled = false;
-  var finish = function(tag){
+  var finish = function(){
     if(settled) return; settled = true;
     applyTheme(t); renderSummary();
-    var e=document.getElementById('svDiag'); if(e) e.textContent = 'v' + VERSION + ' \u00b7 ' + tag;
     try{ if(t.sizeTo) t.sizeTo('#summaryView'); }catch(_){}
   };
-  var tryGet = function(src){
+  var tryGet = function(){
     if(settled) return;
-    var e=document.getElementById('svDiag'); if(e) e.textContent = 'reading (' + src + ')…';
     try{
       var p = t.get('card','shared','rt');
       if(p && p.then){
-        p.then(function(d){ finish('data:' + (hydrateState(d) ? ('yes n=' + Object.keys((d&&d.qty)||{}).length) : 'empty') + ' (' + src + ')'); },
-               function(er){ finish('data:err (' + src + ') ' + (er&&er.message?er.message:String(er))); });
-      } else { finish('data:nopromise (' + src + ')'); }
+        p.then(function(d){ hydrateState(d); finish(); }, function(){ finish(); });
+      } else { finish(); }
     }catch(er){ /* swallow — let another path try */ }
   };
-  /* v1.1 primary path: data delivered by the connector in the URL — no Trello round-trip needed. */
+  /* Primary path: data delivered by the connector in the URL — no Trello round-trip needed. */
   var dParam = getParam('d');
   if(dParam !== null){
-    if(dParam === ''){ finish('data:empty (url)'); }
+    if(dParam === ''){ finish(); }
     else {
-      try{ var d = JSON.parse(dParam);
-           finish('data:' + (hydrateState(d) ? ('yes n=' + Object.keys((d&&d.qty)||{}).length) : 'empty') + ' (url)');
-      }catch(er){ svDiag('url parse err — falling back'); }
+      try{ hydrateState(JSON.parse(dParam)); finish(); }
+      catch(er){ /* malformed — fall through to Trello paths below */ }
     }
   }
-  try{ t.render(function(){ applyTheme(t); tryGet('render'); }); }catch(err){}   // canonical path (fallback)
-  setTimeout(function(){ tryGet('t600'); }, 600);                                 // fallback if render never fires
-  setTimeout(function(){ if(!settled) finish('data:timeout'); }, 3500);          // last resort so it never sticks on Loading
+  try{ t.render(function(){ applyTheme(t); tryGet(); }); }catch(err){}   // canonical path (fallback)
+  setTimeout(function(){ tryGet(); }, 600);                              // fallback if render never fires
+  setTimeout(function(){ finish(); }, 3500);                             // last resort so it never sticks on Loading
 }
 
 function initEditor(){
