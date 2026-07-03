@@ -253,6 +253,8 @@
   .hist .he.quoted{border-left:2px solid var(--blue)}
   .hist .he .hd{flex:0 0 auto; font-weight:600}
   .hist .he .hd.pos{color:var(--green)} .hist .he .hd.neg{color:#f87168}
+  .hist .he.hby{border-left:3px solid var(--blue); background:var(--subtle)}
+  .hist .he.hby .hn small{white-space:normal}
   .hist .he.reset .hn{color:var(--dimmer); font-style:italic}
   .hist .empty{padding:10px 6px; color:var(--dimmer); font-size:12px; text-align:center}
 
@@ -627,7 +629,17 @@ function commitRowEdit(id,save){ const ref=refs[id];
   ref.qedit.hidden=true; ref.qty.hidden=false; updateRow(id,save); recalc(); renderHist();
 }
 function pushHist(e){ if(state.quoteMode && !e.note) e.quote=true; state.history.unshift(e); }
-function logHist(id,delta,source){ const r=RATES.find(x=>x.id===id); pushHist({t:Date.now(),name:r.name,kind:r.kind,delta,mode:state.mode,source}); }
+function logHist(id,delta,source){
+  const r=RATES.find(x=>x.id===id);
+  const e={t:Date.now(),name:r.name,kind:r.kind,delta,mode:state.mode,source};
+  if(_memberTag) e.by=_memberTag;
+  if(r.group==='Staff Time' && r.kind==='time' && _memberTag){
+    if(!state.hoursBy) state.hoursBy={};
+    const nv = Math.round(((state.hoursBy[_memberTag]||0)+delta)*100)/100;
+    if(Math.abs(nv) < 0.005) delete state.hoursBy[_memberTag]; else state.hoursBy[_memberTag]=nv;
+  }
+  pushHist(e);
+}
 
 function addPrepurchase(){
   if(locked()) return;
@@ -846,8 +858,13 @@ function renderHist(){
   $('#histBtn').textContent=`History (${state.history.length})`;
   const h=$('#histList');
   h.classList.toggle('picking', !!state.restorePick);
-  if(!state.history.length){ h.innerHTML=`<div class="empty">No activity yet.</div>`; return; }
-  h.innerHTML=state.history.slice(0,150).map((e,i)=>{
+  const by = state.hoursBy || {};
+  const bkeys = Object.keys(by).filter(k=>Math.abs(by[k])>0.005).sort((a,b)=>by[b]-by[a]);
+  const byRow = bkeys.length
+    ? `<div class="he hby"><span class="hn">Staff hours by member<small>${bkeys.map(k=>esc(k)+' \u00b7 '+fmtQty(by[k])+'h').join(' &nbsp;\u2022&nbsp; ')}</small></span></div>`
+    : '';
+  if(!state.history.length){ h.innerHTML = byRow || `<div class="empty">No activity yet.</div>`; return; }
+  h.innerHTML=byRow+state.history.slice(0,150).map((e,i)=>{
     const dt=new Date(e.t);
     const date=dt.toLocaleDateString('en-US',{month:'numeric',day:'numeric',year:'2-digit'});
     const time=dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
@@ -1092,6 +1109,7 @@ function resetAll(){
   RATES.forEach(r=>state.qty[r.id]=0); state.prepurchase=[]; state.ppEditing=null;
   Object.keys(state.waived).forEach(k=>state.waived[k]=0);
   state.quoted={}; state.quoteBase={};
+  state.hoursBy={};
   state.budget=null; state.budgetStatus='undefined'; updateBudgetStatus();
   state.history.unshift({t:Date.now(), reset:true, mode:state.mode, delta:-cleared});
   document.querySelectorAll('#list .min, #waivedList .min, #waivedMatList .min').forEach(i=>i.value='');
@@ -1232,7 +1250,7 @@ _ready = true;   // from here on, user edits trigger debounced saveCard()
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '2.3';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '2.4';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1246,7 +1264,7 @@ function serializeState(){
   return { v:1, mode:state.mode, qty:state.qty, pp:state.prepurchase,
     budget:state.budget, bstat:state.budgetStatus,
     wt:state.waiveTime, wm:state.waiveMat, waived:state.waived,
-    quoted:state.quoted, qbase:state.quoteBase, bimp:!!state.budgetImported };
+    quoted:state.quoted, qbase:state.quoteBase, bimp:!!state.budgetImported, hby:state.hoursBy||{} };
 }
 function hydrateState(d){
   if(!d || typeof d!=='object') return false;
@@ -1261,6 +1279,7 @@ function hydrateState(d){
   state.quoted = (d.quoted && typeof d.quoted==='object') ? d.quoted : {};
   state.quoteBase = (d.qbase && typeof d.qbase==='object') ? d.qbase : {};
   state.budgetImported = !!d.bimp;
+  state.hoursBy = (d.hby && typeof d.hby==='object') ? d.hby : {};
   return true;
 }
 var SAVE_DELAY = 800, _edBC = null;
@@ -1276,7 +1295,7 @@ function serializeHist(){
   for(var i=0; i<state.history.length && out.length<40; i++){
     var e = state.history[i];
     var c = { t:e.t, name:e.name, kind:e.kind, delta:e.delta, mode:e.mode,
-              source:e.source, note:e.note, reset:e.reset, quote:e.quote, detail:e.detail };
+              source:e.source, note:e.note, reset:e.reset, quote:e.quote, detail:e.detail, by:e.by };
     Object.keys(c).forEach(function(k){ if(c[k]===undefined) delete c[k]; });
     var js = JSON.stringify(c);
     if(size + js.length + 1 > 2300) break;
@@ -1544,8 +1563,20 @@ function initSummary(){
   setTimeout(function(){ finish(); }, 3500);                             // last resort so it never sticks on Loading
 }
 
+var _memberTag = null;
+function memberTagFrom(m){
+  var n = ((m && (m.fullName || m.username)) || '').trim();
+  if(!n) return null;
+  var parts = n.split(/\s+/);
+  if(parts.length === 1) return parts[0];
+  return parts[0] + ' ' + parts[parts.length-1].charAt(0).toUpperCase() + '.';
+}
 function initEditor(){
   try{ _t = window._t = window.TrelloPowerUp.iframe(); }catch(e){ _t=null; }
+  try{
+    var pm = _t && _t.member ? _t.member('fullName','username') : null;
+    if(pm && pm.then) pm.then(function(m){ _memberTag = memberTagFrom(m); }, function(){});
+  }catch(e){}
   setTimeout(function(){ try{ document.body.setAttribute('tabindex','-1'); document.body.focus({preventScroll:true}); }catch(e){} }, 120);   // pull focus off Trello's modal X (kills the blue ring)
   loadCard(function(){ initFullApp(); });   // hydrate from saved card data, then build
 }
