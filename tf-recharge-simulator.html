@@ -1232,7 +1232,7 @@ _ready = true;   // from here on, user edits trigger debounced saveCard()
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '2.2';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '2.3';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1399,7 +1399,11 @@ function renderSummary(){
    may sit between the label and the digits, which blocks the date fall-through. */
 function parseBudgetFromDesc(desc){
   if(!desc || typeof desc !== 'string') return null;
-  var m = desc.match(/Max\s+Budget\s*:?\s*\$?\s*\$?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)/i);
+  /* Raw Trello descriptions are markdown: the label typically arrives as
+     "**Max Budget:** $ 900". Allow markdown decoration (* _ \\) and colons in the
+     gaps, but never letters — so a blank field followed by "Target Completion
+     Date 08/31/2029" still cannot match the date digits. */
+  var m = desc.match(/Max[\s*_]+Budget[\s:*_\\]*\$?[\s*_\\]*\$?[\s*_\\]*([0-9][0-9,]*(?:\.[0-9]{1,2})?)/i);
   if(!m) return null;
   var v = parseFloat(m[1].replace(/,/g,''));
   if(!isFinite(v) || v <= 0 || v > 10000000) return null;
