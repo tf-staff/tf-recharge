@@ -325,6 +325,7 @@
   .fc-bfill.over{background:#f87168}
   .fc-bcap{display:flex;justify-content:space-between;font-size:10.5px;color:var(--rt-subtle,#96999e);margin-top:3px;font-variant-numeric:tabular-nums}
   .fc-bcap .over{color:#f87168;font-weight:700}
+  #summaryView.filled #svBody{background:var(--rt-btn,rgba(255,255,255,.05));border-radius:8px;padding:10px 13px}
   .fc-empty{font-size:12.5px;color:var(--rt-subtle,#96999e);padding:5px 0 2px}
   .fc-cols{display:grid;grid-template-columns:1fr 1fr;column-gap:22px;align-items:start;margin-top:2px}
   .fc-ghdr{display:flex;gap:9px;align-items:baseline;font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--rt-subtle,#96999e);margin:8px 0 2px;font-variant-numeric:tabular-nums}
@@ -345,7 +346,6 @@
 <body>
 <div id="summaryView">
   <div id="svBody"></div>
-  <div class="sv-foot"><span class="sv-ver" id="svVer"></span></div>
 </div>
 <div id="verBadge"></div>
 <div class="panel">
@@ -359,6 +359,8 @@
         <button id="modeNon" aria-pressed="false">External</button>
       </div>
       <button class="gear" id="gearBtn" title="Rate settings" aria-label="Rate settings">&#9881;</button>
+      <button class="qbtn save" id="saveCloseBtn" title="Save and close">Save</button>
+      <button class="qbtn cancel" id="cancelBtn" title="Discard changes made since opening, then close">Cancel</button>
     </div>
   </div>
 
@@ -1240,7 +1242,15 @@ $('#histBtn').onclick=()=>{ $('#hist').classList.toggle('hidden'); };
 $('#gearBtn').onclick=()=>{ const hidden=$('#settings').classList.toggle('hidden'); if(!hidden) buildSettings(); };
 $('#setDone').onclick=()=>$('#settings').classList.add('hidden');
 $('#setRestore').onclick=restoreDefaults;
+$('#saveCloseBtn').onclick=()=>{ saveNow(); setTimeout(()=>{ try{ _t.closeModal(); }catch(e){} }, 150); };
+$('#cancelBtn').onclick=()=>{
+  _canceling = true;
+  clearTimeout(_saveTimer); _saveTimer = null;
+  try{ if(_openPayload && _t) _t.set('card','shared', _openPayload); }catch(e){}
+  setTimeout(()=>{ try{ _t.closeModal(); }catch(e){} }, 150);
+};
 _ready = true;   // from here on, user edits trigger debounced saveCard()
+_openPayload = JSON.parse(JSON.stringify(savePayload()));   // DEEP copy — serializeState returns live refs
 }
 
 /* ----- Trello Power-Up context dispatch ----- */
@@ -1250,7 +1260,7 @@ _ready = true;   // from here on, user edits trigger debounced saveCard()
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '2.4';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '2.5';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1282,7 +1292,7 @@ function hydrateState(d){
   state.hoursBy = (d.hby && typeof d.hby==='object') ? d.hby : {};
   return true;
 }
-var SAVE_DELAY = 800, _edBC = null;
+var SAVE_DELAY = 800, _edBC = null, _canceling = false, _openPayload = null;
 function saveChip(txt, cls){
   var c = document.getElementById('saveChip'); if(!c) return;
   if(!txt){ c.hidden = true; return; }
@@ -1306,7 +1316,7 @@ function serializeHist(){
 }
 function savePayload(){ return { rt: serializeState(), rt_h: serializeHist() }; }
 function saveNow(){
-  if(!_t) return;
+  if(!_t || _canceling) return;
   clearTimeout(_saveTimer); _saveTimer = null;
   try{
     var p = _t.set('card','shared', savePayload());
@@ -1334,10 +1344,10 @@ function relayFlush(){
   }catch(e){}
 }
 ['pagehide','beforeunload'].forEach(function(ev){
-  window.addEventListener(ev, function(){ if(_saveTimer){ relayFlush(); saveNow(); } });
+  window.addEventListener(ev, function(){ if(_saveTimer && !_canceling){ relayFlush(); saveNow(); } });
 });
 document.addEventListener('visibilitychange', function(){
-  if(document.visibilityState === 'hidden' && _saveTimer){ relayFlush(); saveNow(); }
+  if(document.visibilityState === 'hidden' && _saveTimer && !_canceling){ relayFlush(); saveNow(); }
 });
 function loadCard(cb){
   if(!_t){ cb && cb(false); return; }
@@ -1363,7 +1373,9 @@ function renderSummary(){
   var body = document.getElementById('svBody'); if(!body) return;
   var anyQty = RATES.some(function(r){ return (state.qty[r.id]||0) > 0; });
   var isEmpty = !anyQty && !(state.prepurchase||[]).length && !(state.budget != null && state.budget > 0);
-  if(isEmpty){ body.innerHTML = '<div class="fc-empty">No current recharge details</div>'; return; }
+  var sv = document.getElementById('summaryView');
+  if(isEmpty){ if(sv) sv.classList.remove('filled'); body.innerHTML = '<div class="fc-empty">No current recharge details</div>'; return; }
+  if(sv) sv.classList.add('filled');
   var total = netTotal();
   var groupSub = function(g){
     return RATES.filter(function(r){ return r.group===g; })
@@ -1461,10 +1473,10 @@ function estimateFaceHeight(d){
       if(typeof d.budget === 'number' && d.budget > 0) empty = false;
     }
   }catch(e){}
-  if(empty) return 78;
+  if(empty) return 66;
   var left = 2*22 + 6*23;                 // 2 headers + 6 lines
   var right = 2*22 + (3 + pp)*23;         // 2 headers + 3 material lines + orders
-  var h = 92 + Math.max(left, right);     // top row + footer + padding + Trello slack
+  var h = 98 + Math.max(left, right);     // top row + panel padding + Trello slack
   try{
     if(d && typeof d === 'object'){
       if(typeof d.budget === 'number' && d.budget > 0) h += 36;
@@ -1497,7 +1509,7 @@ function initConnector(){
         var url = SELF + '?view=summary&cb=' + Date.now() + '&d=' + encodeURIComponent(dataStr);
         try{ if(t.signUrl) url = t.signUrl(url); }catch(e){}   // signed URLs authenticate the iframe's Trello channel
         return {
-          title: 'Recharge',
+          title: 'TF-Recharge v' + VERSION,
           icon: TRELLO_ICON,
           content: { type:'iframe', url: url, height: estimateFaceHeight(d) },
           action: { text: 'Open', callback: function(tt){
@@ -1532,7 +1544,6 @@ function initSummary(){
   _t = window._t = t;
   applyTheme(t);
   [150,500,1200,2500].forEach(function(ms){ setTimeout(function(){ applyTheme(t); }, ms); });   // catch late theme attr
-  var vb = document.getElementById('svVer'); if(vb) vb.textContent = 'v' + VERSION;
   var settled = false;
   var finish = function(){
     if(settled) return; settled = true;
