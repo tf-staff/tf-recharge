@@ -318,9 +318,12 @@
   .sv-label{font-size:11px;color:var(--rt-subtle,#626f86);text-transform:uppercase;letter-spacing:.04em;font-weight:700}
   .sv-total{font-size:20px;font-weight:800;color:var(--rt-text,#cecfd2);font-variant-numeric:tabular-nums}
   .fc-top{display:flex;align-items:baseline;gap:9px}
-  .fc-lock,.fc-copy{appearance:none;cursor:pointer;background:transparent;border:1px solid var(--rt-line,#46474b);border-radius:5px;padding:1px 6px;font-size:11.5px;line-height:1.5;color:var(--rt-text,#cecfd2)}
-  .fc-lock:hover,.fc-copy:hover{border-color:#579dff}
-  .fc-lock.on{border-color:rgba(87,157,255,.6);background:rgba(87,157,255,.14)}
+  .fc-lock{appearance:none;cursor:pointer;background:transparent;border:1px solid var(--rt-line,#46474b);border-radius:5px;padding:2px 6px;line-height:0;color:var(--rt-subtle,#96999e)}
+  .fc-lock:hover{border-color:#579dff;color:#579dff}
+  .fc-lock.on{border-color:rgba(87,157,255,.6);color:#579dff}
+  .fc-vc{appearance:none;cursor:pointer;background:transparent;border:0;padding:0 1px;line-height:0;color:var(--rt-subtle,#96999e);display:inline-flex;align-items:center;font-size:11px}
+  .fc-vc:hover{color:#579dff}
+  .fc-vc.done{color:#579dff;line-height:1}
   .fc-budlabel{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--rt-subtle,#96999e);font-variant-numeric:tabular-nums}
   .fc-bud{margin:7px 0 2px}
   .fc-bbar{height:6px;background:var(--rt-line,#46474b);border-radius:999px;overflow:hidden}
@@ -1263,7 +1266,7 @@ _openPayload = JSON.parse(JSON.stringify(savePayload()));   // DEEP copy — ser
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '2.7';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '2.8';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1383,12 +1386,17 @@ function renderSummary(){
   };
   var h = '';
   var billing = state.budgetStatus === 'billing';
+  var vcopy = function(v, label){
+    return billing ? '<button type="button" class="fc-vc" data-act="vcopy" data-v="' + v + '" title="Copy ' + label + '" aria-label="Copy ' + label + '">' + COPY_SVG + '</button>' : '';
+  };
+  var statusTxt = BSTAT_LABEL[state.budgetStatus] || '';
+  var budTxt = (state.budget!=null && state.budget>0) ? ('Budget ' + usd.format(state.budget)) : '';
   h += '<div class="fc-top"><b class="sv-total">' + usd.format(total) + '</b>' +
+       vcopy(total.toFixed(2), 'total') +
        '<button type="button" class="fc-lock' + (billing?' on':'') + '" data-act="lock" title="' +
          (billing ? 'Sent to billing \u2014 tap to unlock' : 'Mark as sent to billing') + '">' +
-         (billing ? '\uD83D\uDD12' : '\uD83D\uDD13') + '</button>' +
-       (billing ? '<button type="button" class="fc-copy" data-act="copy" title="Copy billing summary">\uD83D\uDCCB</button>' : '') +
-       '<span class="fc-budlabel">' + (state.budget!=null && state.budget>0 ? ('Budget ' + usd.format(state.budget)) : '') + '</span></div>';
+         (billing ? LOCK_SVG : UNLOCK_SVG) + '</button>' +
+       '<span class="fc-budlabel">' + [statusTxt, budTxt].filter(Boolean).join(' \u00b7 ') + '</span></div>';
   if(state.budget != null && state.budget > 0){
     var pct = total/state.budget*100, shown = Math.max(0, Math.min(100, pct)), rem = state.budget - total;
     var cls = pct > 100 ? 'over' : (pct > 90 ? 'warn' : '');
@@ -1410,11 +1418,13 @@ function renderSummary(){
     RATES.filter(function(r){ return r.group===g && r.kind!=='prepurchase'; }).forEach(function(r){
       var q = state.qty[r.id]||0;
       out += '<div class="fc-line"><span class="fc-qbox' + (q>0?' nz':'') + '">' + fmtQty(q) + '</span>' +
+             vcopy(fmtQty(q), r.name) +
              '<span class="fc-name">' + esc(r.name) + '<i>' + rateLabel(r) + '</i></span></div>';
     });
     if(g==='Supplies'){
       (state.prepurchase||[]).forEach(function(e, i){
         out += '<div class="fc-line"><span class="fc-qbox">' + (i+1) + '</span>' +
+               vcopy((e.amount||0).toFixed(2), 'order amount') +
                '<span class="fc-name">' + esc(e.id || 'Order ' + (i+1)) + '<i>' + usd.format(e.amount||0) + '</i></span></div>';
       });
     }
@@ -1545,6 +1555,9 @@ function applyTheme(t){
   return d;
 }
 
+var LOCK_SVG='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+var UNLOCK_SVG='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>';
+var BSTAT_LABEL={ 'undefined':'', calculated:'Calculated', shared:'Shared with Client', approved:'Approved By Client', billing:'Sent to billing' };
 function faceRelaySave(){
   /* rt only — no rt_h key, so the connector's object t.set leaves history untouched */
   try{ new BroadcastChannel('tf-rt').postMessage({ type:'save', data: { rt: serializeState() } }); }catch(e){}
@@ -1561,12 +1574,12 @@ function wireFaceActions(){
       else { state.budgetStatus = state.pbs || 'undefined'; state.pbs = undefined; }
       renderSummary();
       faceRelaySave();   // triggers t.set via connector; section reload confirms
-    } else if(b.dataset.act === 'copy'){
-      var g = quoteData();
-      copyQuote(quotePlain(g), quoteHtml(g)).then(function(ok){
-        b.textContent = ok ? '\u2713' : '!';
-        setTimeout(function(){ b.textContent = '\uD83D\uDCCB'; }, 1000);
-        if(!ok) window.prompt('Copy the summary below:', quotePlain(g));
+    } else if(b.dataset.act === 'vcopy'){
+      copyText(b.dataset.v).then(function(ok){
+        b.classList.add('done');
+        b.innerHTML = ok ? '\u2713' : '!';
+        setTimeout(function(){ b.classList.remove('done'); b.innerHTML = COPY_SVG; }, 900);
+        if(!ok) window.prompt('Copy the value:', b.dataset.v);
       });
     }
   });
