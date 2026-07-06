@@ -24,7 +24,8 @@
   .panel{max-width:690px; margin:0 auto; background:var(--panel); position:relative;
     border:none; border-radius:10px; padding:12px 18px 10px;}
 
-  .head{display:flex; align-items:center; gap:10px; margin-bottom:4px}
+  .head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:4px; position:relative}
+  .qenter.head-center{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%)}
   .savechip{font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;border:1px solid var(--line);color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap}
   .savechip.ok{color:var(--green);border-color:rgba(75,206,151,.45)}
   .savechip.err{color:#f87168;border-color:rgba(248,113,104,.45)}
@@ -304,8 +305,8 @@
   .set-quick{width:92px; text-align:left; font-size:11.5px !important}
   /* ===== Trello Power-Up: summary view (shown on the card back) ===== */
   /* Trello sets data-color-mode="light|dark" on <html>; adapt to both themes. */
-  html[data-color-mode="light"]{--rt-bg:#ffffff;--rt-text:#292a2e;--rt-subtle:#6b6e76;--rt-line:#dcdfe4;--rt-btn:rgba(0,0,0,.05)}
-  html[data-color-mode="dark"]{--rt-bg:#242528;--rt-text:#cecfd2;--rt-subtle:#96999e;--rt-line:#46474b;--rt-btn:rgba(255,255,255,.08)}
+  html[data-color-mode="light"]{--rt-bg:#ffffff;--rt-text:#292a2e;--rt-subtle:#6b6e76;--rt-line:#dcdfe4;--rt-btn:rgba(0,0,0,.05);--rt-panel:#f1f2f4}
+  html[data-color-mode="dark"]{--rt-bg:#242528;--rt-text:#cecfd2;--rt-subtle:#96999e;--rt-line:#46474b;--rt-btn:rgba(255,255,255,.08);--rt-panel:#2b2c2f}
   html{background:transparent}
   body.tp-summary{background:var(--rt-bg,transparent);margin:0;padding:0}
   body.tp-connector{background:transparent;margin:0;padding:0}
@@ -325,7 +326,7 @@
   .fc-bfill.over{background:#f87168}
   .fc-bcap{display:flex;justify-content:space-between;font-size:10.5px;color:var(--rt-subtle,#96999e);margin-top:3px;font-variant-numeric:tabular-nums}
   .fc-bcap .over{color:#f87168;font-weight:700}
-  #summaryView.filled #svBody{background:var(--rt-btn,rgba(255,255,255,.05));border-radius:8px;padding:10px 13px}
+  #summaryView.filled #svBody{background:var(--rt-panel,#2b2c2f);border-radius:8px;padding:10px 13px}
   .fc-empty{font-size:12.5px;color:var(--rt-subtle,#96999e);padding:5px 0 2px}
   .fc-cols{display:grid;grid-template-columns:1fr 1fr;column-gap:22px;align-items:start;margin-top:2px}
   .fc-ghdr{display:flex;gap:9px;align-items:baseline;font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--rt-subtle,#96999e);margin:8px 0 2px;font-variant-numeric:tabular-nums}
@@ -350,14 +351,12 @@
 <div id="verBadge"></div>
 <div class="panel">
   <div class="head">
-    <span class="title"><span class="dollar">&#x1F4B2;&#xFE0E;</span>Recharge Activity</span>
-    <span class="savechip" id="saveChip" hidden></span>
+    <div class="seg" role="group" aria-label="Rate tier">
+      <button id="modeUcd" aria-pressed="true">Internal</button>
+      <button id="modeNon" aria-pressed="false">External</button>
+    </div>
+    <button class="qenter head-center" id="qEnter">Generate Quote</button>
     <div class="head-right">
-      <button class="qenter" id="qEnter">Generate Quote</button>
-      <div class="seg" role="group" aria-label="Rate tier">
-        <button id="modeUcd" aria-pressed="true">Internal</button>
-        <button id="modeNon" aria-pressed="false">External</button>
-      </div>
       <button class="gear" id="gearBtn" title="Rate settings" aria-label="Rate settings">&#9881;</button>
       <button class="qbtn save" id="saveCloseBtn" title="Save and close">Save</button>
       <button class="qbtn cancel" id="cancelBtn" title="Discard changes made since opening, then close">Cancel</button>
@@ -1260,7 +1259,7 @@ _openPayload = JSON.parse(JSON.stringify(savePayload()));   // DEEP copy — ser
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '2.5';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '2.6';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1293,11 +1292,7 @@ function hydrateState(d){
   return true;
 }
 var SAVE_DELAY = 800, _edBC = null, _canceling = false, _openPayload = null;
-function saveChip(txt, cls){
-  var c = document.getElementById('saveChip'); if(!c) return;
-  if(!txt){ c.hidden = true; return; }
-  c.hidden = false; c.textContent = txt; c.className = 'savechip' + (cls ? ' ' + cls : '');
-}
+function saveChip(){ /* v2.6: notifications retired — Save/Cancel buttons carry the intent */ }
 /* Compact, byte-budgeted history for persistence (Trello caps card data at 4096 chars total).
    Snapshots are stripped; the list itself survives close/reopen. */
 function serializeHist(){
