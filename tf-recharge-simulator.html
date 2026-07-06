@@ -318,6 +318,9 @@
   .sv-label{font-size:11px;color:var(--rt-subtle,#626f86);text-transform:uppercase;letter-spacing:.04em;font-weight:700}
   .sv-total{font-size:20px;font-weight:800;color:var(--rt-text,#cecfd2);font-variant-numeric:tabular-nums}
   .fc-top{display:flex;align-items:baseline;gap:9px}
+  .fc-lock,.fc-copy{appearance:none;cursor:pointer;background:transparent;border:1px solid var(--rt-line,#46474b);border-radius:5px;padding:1px 6px;font-size:11.5px;line-height:1.5;color:var(--rt-text,#cecfd2)}
+  .fc-lock:hover,.fc-copy:hover{border-color:#579dff}
+  .fc-lock.on{border-color:rgba(87,157,255,.6);background:rgba(87,157,255,.14)}
   .fc-budlabel{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--rt-subtle,#96999e);font-variant-numeric:tabular-nums}
   .fc-bud{margin:7px 0 2px}
   .fc-bbar{height:6px;background:var(--rt-line,#46474b);border-radius:999px;overflow:hidden}
@@ -332,6 +335,7 @@
   .fc-ghdr{display:flex;gap:9px;align-items:baseline;font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--rt-subtle,#96999e);margin:8px 0 2px;font-variant-numeric:tabular-nums}
   .fc-ghdr .v{color:var(--rt-text,#cecfd2)}
   .fc-line{display:flex;align-items:center;gap:7px;padding:1.5px 0}
+  .fc-qbox.nz{color:#579dff;border-color:rgba(87,157,255,.55);font-weight:700}
   .fc-qbox{min-width:26px;text-align:center;font-size:11px;font-variant-numeric:tabular-nums;border:1px solid var(--rt-line,#46474b);background:var(--rt-btn,rgba(255,255,255,.06));color:var(--rt-text,#cecfd2);border-radius:4px;padding:1.5px 4px}
   .fc-name{font-size:12px;font-weight:600;color:var(--rt-text,#cecfd2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .fc-name i{font-style:normal;font-weight:500;font-size:10px;color:var(--rt-subtle,#96999e);margin-left:4px}
@@ -1259,7 +1263,7 @@ _openPayload = JSON.parse(JSON.stringify(savePayload()));   // DEEP copy — ser
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '2.6';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '2.7';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1273,7 +1277,7 @@ function serializeState(){
   return { v:1, mode:state.mode, qty:state.qty, pp:state.prepurchase,
     budget:state.budget, bstat:state.budgetStatus,
     wt:state.waiveTime, wm:state.waiveMat, waived:state.waived,
-    quoted:state.quoted, qbase:state.quoteBase, bimp:!!state.budgetImported, hby:state.hoursBy||{} };
+    quoted:state.quoted, qbase:state.quoteBase, bimp:!!state.budgetImported, hby:state.hoursBy||{}, pbs:state.pbs };
 }
 function hydrateState(d){
   if(!d || typeof d!=='object') return false;
@@ -1283,6 +1287,7 @@ function hydrateState(d){
     return { id:e.id||'', url:e.url||'', amount:(typeof e.amount==='number'?e.amount:0) }; }) : [];
   state.budget = (typeof d.budget==='number') ? d.budget : null;
   state.budgetStatus = d.bstat || 'undefined';
+  state.pbs = (typeof d.pbs==='string') ? d.pbs : undefined;
   state.waiveTime = !!d.wt; state.waiveMat = !!d.wm;
   state.waived = (d.waived && typeof d.waived==='object') ? d.waived : {};
   state.quoted = (d.quoted && typeof d.quoted==='object') ? d.quoted : {};
@@ -1377,7 +1382,12 @@ function renderSummary(){
                 .reduce(function(a,r){ return a + lineCost(r); }, 0);
   };
   var h = '';
+  var billing = state.budgetStatus === 'billing';
   h += '<div class="fc-top"><b class="sv-total">' + usd.format(total) + '</b>' +
+       '<button type="button" class="fc-lock' + (billing?' on':'') + '" data-act="lock" title="' +
+         (billing ? 'Sent to billing \u2014 tap to unlock' : 'Mark as sent to billing') + '">' +
+         (billing ? '\uD83D\uDD12' : '\uD83D\uDD13') + '</button>' +
+       (billing ? '<button type="button" class="fc-copy" data-act="copy" title="Copy billing summary">\uD83D\uDCCB</button>' : '') +
        '<span class="fc-budlabel">' + (state.budget!=null && state.budget>0 ? ('Budget ' + usd.format(state.budget)) : '') + '</span></div>';
   if(state.budget != null && state.budget > 0){
     var pct = total/state.budget*100, shown = Math.max(0, Math.min(100, pct)), rem = state.budget - total;
@@ -1398,7 +1408,8 @@ function renderSummary(){
   var group = function(g){
     var out = '<div class="fc-ghdr"><span>' + esc(g) + '</span><span class="v">' + usd.format(groupSub(g)) + '</span></div>';
     RATES.filter(function(r){ return r.group===g && r.kind!=='prepurchase'; }).forEach(function(r){
-      out += '<div class="fc-line"><span class="fc-qbox">' + fmtQty(state.qty[r.id]||0) + '</span>' +
+      var q = state.qty[r.id]||0;
+      out += '<div class="fc-line"><span class="fc-qbox' + (q>0?' nz':'') + '">' + fmtQty(q) + '</span>' +
              '<span class="fc-name">' + esc(r.name) + '<i>' + rateLabel(r) + '</i></span></div>';
     });
     if(g==='Supplies'){
@@ -1534,8 +1545,35 @@ function applyTheme(t){
   return d;
 }
 
+function faceRelaySave(){
+  /* rt only — no rt_h key, so the connector's object t.set leaves history untouched */
+  try{ new BroadcastChannel('tf-rt').postMessage({ type:'save', data: { rt: serializeState() } }); }catch(e){}
+}
+function wireFaceActions(){
+  var bodyEl = document.getElementById('svBody');
+  if(!bodyEl || bodyEl._wired) return;
+  bodyEl._wired = true;
+  bodyEl.addEventListener('click', function(ev){
+    var b = ev.target && ev.target.closest ? ev.target.closest('button[data-act]') : null;
+    if(!b) return;
+    if(b.dataset.act === 'lock'){
+      if(state.budgetStatus !== 'billing'){ state.pbs = state.budgetStatus; state.budgetStatus = 'billing'; }
+      else { state.budgetStatus = state.pbs || 'undefined'; state.pbs = undefined; }
+      renderSummary();
+      faceRelaySave();   // triggers t.set via connector; section reload confirms
+    } else if(b.dataset.act === 'copy'){
+      var g = quoteData();
+      copyQuote(quotePlain(g), quoteHtml(g)).then(function(ok){
+        b.textContent = ok ? '\u2713' : '!';
+        setTimeout(function(){ b.textContent = '\uD83D\uDCCB'; }, 1000);
+        if(!ok) window.prompt('Copy the summary below:', quotePlain(g));
+      });
+    }
+  });
+}
 function initSummary(){
   var t = window.TrelloPowerUp.iframe();
+  wireFaceActions();
   _t = window._t = t;
   applyTheme(t);
   [150,500,1200,2500].forEach(function(ms){ setTimeout(function(){ applyTheme(t); }, ms); });   // catch late theme attr
