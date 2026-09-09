@@ -5,7 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Recharge Tracker — Trello Power-Up Simulator</title>
 <script src="https://p.trellocdn.com/power-up.min.js"></script>
+<script>
+(function(){ try{
+  var q = new URLSearchParams(location.search), v = q.get('view'), h = document.documentElement;
+  var framed = window.self !== window.top;
+  if(v === 'summary') h.classList.add('pre-summary');
+  else if(v === 'editor') h.classList.add('pre-editor');
+  else if(framed) h.classList.add('pre-connector');
+  var th = q.get('th'); if(th === 'light' || th === 'dark') h.setAttribute('data-color-mode', th);
+}catch(e){} })();
+</script>
 <style>
+  /* Pre-boot hiding: no scrollbar flash while the face iframe reloads */
+  html.pre-summary .panel, html.pre-connector .panel, html.pre-connector #summaryView, html.pre-summary #verBadge, html.pre-connector #verBadge{display:none}
+  html.pre-summary, html.pre-summary body, html.pre-connector, html.pre-connector body{scrollbar-width:none; overflow-x:hidden}
+  html.pre-summary::-webkit-scrollbar, html.pre-summary body::-webkit-scrollbar, html.pre-connector::-webkit-scrollbar{display:none}
   :root{
     --bg:#242528; --panel:#2b2c2f;
     --subtle:rgba(255,255,255,.06); --subtle-h:rgba(255,255,255,.12);
@@ -1263,7 +1277,7 @@ _histBase = baselineNow();   // diff baseline for the one-line save summary
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '3.1';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '3.2';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1426,7 +1440,7 @@ function renderSummary(){
   var anyQty = RATES.some(function(r){ return (state.qty[r.id]||0) > 0; });
   var isEmpty = !anyQty && !(state.prepurchase||[]).length && !(state.budget != null && state.budget > 0);
   var sv = document.getElementById('summaryView');
-  if(isEmpty){ if(sv) sv.classList.remove('filled'); body.innerHTML = '<div class="fc-empty">No current recharge details</div>'; return; }
+  if(isEmpty){ if(sv) sv.classList.remove('filled'); body.innerHTML = '<div class="fc-empty">No recharge details</div>'; return; }
   if(sv) sv.classList.add('filled');
   var total = netTotal();
   var groupSub = function(g){
