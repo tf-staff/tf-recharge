@@ -233,7 +233,7 @@
   .hist-bar .hist-lbl{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--dimmer); font-weight:700}
   .hist-bar .link{appearance:none; border:0; background:transparent; cursor:pointer; color:var(--dim);
     font:inherit; font-size:12px; font-weight:600; padding:5px 7px; border-radius:5px}
-  .hist-bar #restorePickBtn{margin-left:auto}
+  .qbanner{font-size:13px;font-weight:900;letter-spacing:.18em;text-align:center;color:#1d2125;background:var(--blue);border-radius:6px;padding:6px 0;margin-bottom:8px}
   .hist-bar .link:hover{background:var(--subtle); color:var(--text)}
   .link.armed{color:var(--blue); background:rgba(87,157,255,.16)}
   .restore-hint{font-size:11px; color:var(--blue); padding:2px 6px 8px}
@@ -314,7 +314,8 @@
   body.tp-connector #summaryView{display:none}
   #summaryView{display:none;padding:2px 4px 4px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
   body.tp-summary #summaryView{display:block}
-  body.tp-summary{overflow-y:auto;overflow-x:hidden}
+  body.tp-summary{overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+  body.tp-summary::-webkit-scrollbar{display:none}
   .sv-label{font-size:11px;color:var(--rt-subtle,#626f86);text-transform:uppercase;letter-spacing:.04em;font-weight:700}
   .sv-total{font-size:20px;font-weight:800;color:var(--rt-text,#cecfd2);font-variant-numeric:tabular-nums}
   .fc-top{display:flex;align-items:baseline;gap:9px}
@@ -364,7 +365,7 @@
       <button id="modeUcd" aria-pressed="true">Internal</button>
       <button id="modeNon" aria-pressed="false">External</button>
     </div>
-    <button class="qenter head-center" id="qEnter">Generate Quote</button>
+    <button class="qenter head-center" id="qEnter">Enter Quote Mode</button>
     <div class="head-right">
       <button class="gear" id="gearBtn" title="Rate settings" aria-label="Rate settings">&#9881;</button>
       <button class="qbtn save" id="saveCloseBtn" title="Save and close">Save</button>
@@ -381,14 +382,13 @@
 
   <div class="quote-mode" id="quoteMode">
     <div class="qactive hidden" id="qActive">
+      <div class="qbanner">QUOTE MODE</div>
       <div class="qinfo">
-        <span class="qttl">Client quote</span>
-        <span class="qsum">Total <b id="qmodeTotal">$0.00</b><span id="qmodeNewWrap"> · new <b id="qmodeNew">$0.00</b></span></span>
+        <span class="qsum">Quote total <b id="qmodeTotal">$0.00</b><span id="qmodeNewWrap" hidden> · new <b id="qmodeNew">$0.00</b></span></span>
         <span class="qwarn" id="qminHint" hidden>Some lines are below their minimum</span>
       </div>
       <div class="qacts">
         <button class="qbtn cancel" id="qCancel">Cancel</button>
-        <button class="qbtn alt" id="qNew">New charges only</button>
         <button class="qbtn save" id="qSave">Save Quote</button>
       </div>
     </div>
@@ -413,6 +413,7 @@
     <div class="status-row waivers-row">
       <span class="sl">Waived</span>
       <label class="waive-toggle"><input type="checkbox" id="waiveChk"> Staff Time</label>
+      <label class="waive-toggle"><input type="checkbox" id="waiveEqChk"> Equipment Time</label>
       <label class="waive-toggle"><input type="checkbox" id="waiveMatChk"> Materials</label>
     </div>
     <div class="bbar"><div class="bfill" id="bfill"></div></div>
@@ -422,6 +423,12 @@
     <div class="ghead"><span class="gname">Waived Staff Time</span><span class="gsub">waived <b class="num" id="waivedSub">-$0.00</b></span></div>
     <div id="waivedList"></div>
     <div class="waived-note">Subtracted from the total — e.g. training time not billed to the client.</div>
+  </div>
+
+  <div class="waived hidden" id="waivedEq">
+    <div class="ghead"><span class="gname">Waived Equipment Time</span><span class="gsub">waived <b class="num" id="waivedEqSub">-$0.00</b></span></div>
+    <div id="waivedEqList"></div>
+    <div class="waived-note">Subtracted from the total — equipment time not billed to the client.</div>
   </div>
 
   <div class="waived hidden" id="waivedMat">
@@ -437,8 +444,7 @@
     <button class="link" id="histBtn">History (0)</button>
   </div>
   <div class="hist hidden" id="hist">
-    <div class="hist-bar"><span class="hist-lbl">Activity history</span><button class="link" id="restorePickBtn">Roll Back</button><button class="link danger" id="resetBtn">Reset all</button></div>
-    <div class="restore-hint" id="restoreHint" hidden>Click an entry below to restore to that point.</div>
+    <div class="hist-bar"><span class="hist-lbl">Activity history</span><button class="link danger" id="resetBtn">Reset all</button></div>
     <div id="histList"></div>
   </div>
 
@@ -482,7 +488,7 @@ const meta = {
   prepurchase: { ph:'$',       suf:'' },
 };
 
-const state = { mode:'ucd', qty:{}, history:[], prepurchase:[], ppEditing:null, budget:null, budgetStatus:'undefined', waiveTime:false, waiveMat:false, waived:{}, quoteMode:false, snapshot:null, quoted:{}, quoteBase:{}, restorePick:false };
+const state = { mode:'ucd', qty:{}, history:[], prepurchase:[], ppEditing:null, budget:null, budgetStatus:'undefined', waiveTime:false, waiveEquip:false, waiveMat:false, waived:{}, quoteMode:false, snapshot:null, quoted:{}, quoteBase:{} };
 RATES.forEach(r => state.qty[r.id] = 0);
 let idSeq = 1000;
 const refs = {}, groupRefs = {}, wrefs = {};
@@ -502,12 +508,14 @@ const sumAll = () => RATES.reduce((a,r)=>a+lineCost(r),0);
 
 const waivableTime = () => RATES.filter(r=>r.group==='Staff Time' && r.kind==='time');
 const waivableMat  = () => RATES.filter(r=>r.group==='Materials'  && r.kind==='material');
+const waivableEquip = () => RATES.filter(r=>r.group==='Equipment Time' && r.kind==='time');
 function waivedCost(r){ const q=state.waived[r.id]||0; return r.kind==='material' ? q/MAT_PER*rateOf(r) : q*rateOf(r); }
 const waivedTimeTotal = () => waivableTime().reduce((a,r)=>a+waivedCost(r),0);
 const waivedMatTotal  = () => waivableMat().reduce((a,r)=>a+waivedCost(r),0);
-function waivedApplied(){ return (state.waiveTime?waivedTimeTotal():0)+(state.waiveMat?waivedMatTotal():0); }
+const waivedEquipTotal = () => waivableEquip().reduce((a,r)=>a+waivedCost(r),0);
+function waivedApplied(){ return (state.waiveTime?waivedTimeTotal():0)+(state.waiveEquip?waivedEquipTotal():0)+(state.waiveMat?waivedMatTotal():0); }
 function netTotal(){ return sumAll()-waivedApplied(); }
-function ensureWaivedKeys(){ [...waivableTime(),...waivableMat()].forEach(r=>{ if(state.waived[r.id]==null) state.waived[r.id]=0; }); }
+function ensureWaivedKeys(){ [...waivableTime(),...waivableEquip(),...waivableMat()].forEach(r=>{ if(state.waived[r.id]==null) state.waived[r.id]=0; }); }
 function unitOf(r){ return (r.unit!=null && String(r.unit).trim()!=='') ? r.unit : '$'; }
 function rateLabel(r){
   if(r.kind==='time'||r.kind==='material'){ const u=unitOf(r); return u==='$' ? '$' : '$'+rateOf(r)+'/'+u; }
@@ -786,6 +794,7 @@ function buildWaiveList(listEl, items){
 function buildWaivers(){
   Object.keys(wrefs).forEach(k=>delete wrefs[k]);
   buildWaiveList($('#waivedList'), waivableTime());
+  buildWaiveList($('#waivedEqList'), waivableEquip());
   buildWaiveList($('#waivedMatList'), waivableMat());
   updateWaivedRows();
 }
@@ -796,7 +805,8 @@ function updateWaivedRow(r){ const ref=wrefs[r.id]; if(!ref) return; const q=sta
   ref.item.classList.toggle('zero', q===0);
 }
 function updateWaivedRows(){
-  waivableTime().forEach(updateWaivedRow); waivableMat().forEach(updateWaivedRow);
+  waivableTime().forEach(updateWaivedRow); waivableEquip().forEach(updateWaivedRow); waivableMat().forEach(updateWaivedRow);
+  const es=$('#waivedEqSub'); if(es) es.textContent='\u2212'+usd.format(waivedEquipTotal());
   const ts=$('#waivedSub'); if(ts) ts.textContent='\u2212'+usd.format(waivedTimeTotal());
   const ms=$('#waivedMatSub'); if(ms) ms.textContent='\u2212'+usd.format(waivedMatTotal());
 }
@@ -820,7 +830,7 @@ function recalc(){
   }
   updateWaivedRows(); updateBudget();
   if(state.quoteMode){ const bad=anyBelowMin();
-    const sv=$('#qSave'), nw=$('#qNew'), hint=$('#qminHint');
+    const sv=$('#qSave'), nw=null, hint=$('#qminHint');
     const full=netTotal();
     const dn = state.snapshot ? withDelta(()=>netTotal()) : full;
     const showNew = !!state.snapshot && (full-dn)>0.005 && dn>0.005;
@@ -835,7 +845,7 @@ function updateBudgetStatus(){ const sel=$('#budgetStatus'); if(!sel) return; se
   const lk=locked(); const panel=document.querySelector('.panel'); if(panel) panel.classList.toggle('locked',lk);
   document.querySelectorAll('.rowedit').forEach(b=>{ const t=lk?'Copy value':'Edit amount'; b.title=t; b.setAttribute('aria-label',t); });
   const bi=$('#budgetInput'); if(bi) bi.disabled=lk;
-  const wc=$('#waiveChk'), wm=$('#waiveMatChk'); if(wc) wc.disabled=lk; if(wm) wm.disabled=lk;
+  const wc=$('#waiveChk'), wm=$('#waiveMatChk'), weq=$('#waiveEqChk'); if(wc) wc.disabled=lk; if(wm) wm.disabled=lk; if(weq) weq.disabled=lk;
 }
 function setBudgetStatus(v){ state.budgetStatus=v; updateBudgetStatus(); saveCard(); }
 function updateBudget(){
@@ -854,7 +864,6 @@ function renderHist(){
   if(state.history.length && !state.history[0].snap) state.history[0].snap = snapshotState();
   $('#histBtn').textContent=`History (${state.history.length})`;
   const h=$('#histList');
-  h.classList.toggle('picking', !!state.restorePick);
   const by = state.hoursBy || {};
   const bkeys = Object.keys(by).filter(k=>Math.abs(by[k])>0.005).sort((a,b)=>by[b]-by[a]);
   const byRow = bkeys.length
@@ -906,9 +915,10 @@ function quotePlain(groups){
     items.forEach(it=>{ if(it.kind==='pp'){ const lab=it.url?`[${it.id||'(no ID)'}](${it.url})`:(it.id||'(no ID)'); L.push(`  - PrePurchasing ${lab}: ${usd.format(it.amount)}`); }
       else L.push(`  - ${it.text}`); });
     L.push(''); });
-  const wt=state.waiveTime?waivedTimeTotal():0, wm=state.waiveMat?waivedMatTotal():0;
+  const wt=(state.waiveTime?waivedTimeTotal():0)+(state.waiveEquip?waivedEquipTotal():0), wm=state.waiveMat?waivedMatTotal():0;
   if(wt+wm>0){ L.push('WAIVED');
     if(state.waiveTime) waivableTime().forEach(r=>{ const h=state.waived[r.id]||0; if(h>0) L.push(`  - ${r.name}: ${fmtQty(h)} h x $${rateOf(r)}/${unitOf(r)} = -${usd.format(waivedCost(r))}`); });
+    if(state.waiveEquip) waivableEquip().forEach(r=>{ const h=state.waived[r.id]||0; if(h>0) L.push(`  - ${r.name}: ${fmtQty(h)} h x $${rateOf(r)}/${unitOf(r)} = -${usd.format(waivedCost(r))}`); });
     if(state.waiveMat) waivableMat().forEach(r=>{ const q=state.waived[r.id]||0; if(q>0) L.push(`  - ${r.name}: ${fmtQty(q)} g/ml x $${rateOf(r)}/${unitOf(r)} = -${usd.format(waivedCost(r))}`); });
     L.push('');
     L.push(`Subtotal: ${usd.format(sumAll())}`);
@@ -928,9 +938,10 @@ function quoteHtml(groups){
     items.forEach(it=>{ if(it.kind==='pp'){ const lab=it.url?`<a href="${esc(it.url)}">${esc(it.id||'(no ID)')}</a>`:esc(it.id||'(no ID)'); L.push(`&nbsp;&nbsp;- PrePurchasing ${lab}: ${usd.format(it.amount)}`); }
       else L.push(`&nbsp;&nbsp;- ${esc(it.text)}`); });
     L.push(''); });
-  const wt=state.waiveTime?waivedTimeTotal():0, wm=state.waiveMat?waivedMatTotal():0;
+  const wt=(state.waiveTime?waivedTimeTotal():0)+(state.waiveEquip?waivedEquipTotal():0), wm=state.waiveMat?waivedMatTotal():0;
   if(wt+wm>0){ L.push(`<b>WAIVED</b>`);
     if(state.waiveTime) waivableTime().forEach(r=>{ const h=state.waived[r.id]||0; if(h>0) L.push(`&nbsp;&nbsp;- ${esc(r.name)}: ${fmtQty(h)} h x $${rateOf(r)}/${unitOf(r)} = -${usd.format(waivedCost(r))}`); });
+    if(state.waiveEquip) waivableEquip().forEach(r=>{ const h=state.waived[r.id]||0; if(h>0) L.push(`&nbsp;&nbsp;- ${esc(r.name)}: ${fmtQty(h)} h x $${rateOf(r)}/${unitOf(r)} = -${usd.format(waivedCost(r))}`); });
     if(state.waiveMat) waivableMat().forEach(r=>{ const q=state.waived[r.id]||0; if(q>0) L.push(`&nbsp;&nbsp;- ${esc(r.name)}: ${fmtQty(q)} g/ml x $${rateOf(r)}/${unitOf(r)} = -${usd.format(waivedCost(r))}`); });
     L.push('');
     L.push(`Subtotal: ${usd.format(sumAll())}`);
@@ -964,7 +975,7 @@ function enterQuoteMode(){
   if(state.quoteMode) return;
   state.snapshot = { qty:{...state.qty}, prepurchase:JSON.parse(JSON.stringify(state.prepurchase)), waived:{...state.waived}, budget:state.budget };
   state.quoteMode=true;
-  const b=$('#qEnter'); b.textContent='Quote Mode Enabled'; b.classList.add('on');
+  const b=$('#qEnter'); b.textContent='Exit Quote Mode'; b.classList.add('on');
   $('#qActive').classList.remove('hidden');
   document.querySelector('.panel').classList.add('qmode-on');
   refreshRows(); recalc();
@@ -972,7 +983,7 @@ function enterQuoteMode(){
 function exitQuoteMode(){
   state.quoteMode=false; state.snapshot=null;
   saveCard();   // persist the post-quote state now that leaking is no longer possible
-  const b=$('#qEnter'); b.textContent='Generate Quote'; b.classList.remove('on');
+  const b=$('#qEnter'); b.textContent='Enter Quote Mode'; b.classList.remove('on');
   $('#qActive').classList.add('hidden');
   document.querySelector('.panel').classList.remove('qmode-on');
   recalc();
@@ -980,7 +991,7 @@ function exitQuoteMode(){
 function snapshotState(){
   return { qty:{...state.qty}, prepurchase:JSON.parse(JSON.stringify(state.prepurchase)), waived:{...state.waived},
     budget:state.budget, budgetStatus:state.budgetStatus, quoted:{...state.quoted}, quoteBase:{...state.quoteBase},
-    mode:state.mode, waiveTime:state.waiveTime, waiveMat:state.waiveMat };
+    mode:state.mode, waiveTime:state.waiveTime, waiveEquip:state.waiveEquip, waiveMat:state.waiveMat };
 }
 function restoreState(snap){
   Object.keys(state.qty).forEach(k=>state.qty[k]=0); Object.assign(state.qty, snap.qty||{});
@@ -989,33 +1000,20 @@ function restoreState(snap){
   Object.keys(state.waived).forEach(k=>state.waived[k]=0); Object.assign(state.waived, snap.waived||{});
   state.budget=(snap.budget!=null?snap.budget:null); state.budgetStatus=snap.budgetStatus||'undefined';
   state.quoted={...(snap.quoted||{})}; state.quoteBase={...(snap.quoteBase||{})};
-  state.waiveTime=!!snap.waiveTime; state.waiveMat=!!snap.waiveMat;
+  state.waiveTime=!!snap.waiveTime; state.waiveEquip=!!snap.waiveEquip; state.waiveMat=!!snap.waiveMat;
+  const wec=$('#waiveEqChk'); if(wec) wec.checked=state.waiveEquip; const wpe=$('#waivedEq'); if(wpe) wpe.classList.toggle('hidden', !state.waiveEquip);
   const bi=$('#budgetInput'); if(bi) bi.value=(state.budget!=null && state.budget>0)?String(state.budget):'';
   const wc=$('#waiveChk'); if(wc) wc.checked=state.waiveTime; const wp=$('#waived'); if(wp) wp.classList.toggle('hidden', !state.waiveTime);
   const wmc=$('#waiveMatChk'); if(wmc) wmc.checked=state.waiveMat; const wp2=$('#waivedMat'); if(wp2) wp2.classList.toggle('hidden', !state.waiveMat);
-  document.querySelectorAll('#list .min, #waivedList .min, #waivedMatList .min').forEach(i=>i.value='');
+  document.querySelectorAll('#list .min, #waivedList .min, #waivedEqList .min, #waivedMatList .min').forEach(i=>i.value='');
   setMode(snap.mode||state.mode);
   updateBudgetStatus(); renderPrepurchase(); refreshRows(); updateWaivedRows();
-}
-function updateRestoreUI(){
-  const btn=$('#restorePickBtn'); if(btn){ btn.textContent=state.restorePick?'Cancel':'Roll Back'; btn.classList.toggle('armed', !!state.restorePick); }
-  const hint=$('#restoreHint'); if(hint) hint.hidden=!state.restorePick;
-  const h=$('#histList'); if(h) h.classList.toggle('picking', !!state.restorePick);
-}
-function toggleRestorePick(){ if(!state.history.length) return; state.restorePick=!state.restorePick; updateRestoreUI(); renderHist(); }
-function restoreToIndex(i){
-  const e=state.history[i]; if(!e||!e.snap) return;
-  restoreState(e.snap);
-  const time=new Date(e.t).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
-  state.history.unshift({t:Date.now(), note:true, name:'Restored to '+time, detail:'', snap:snapshotState()}); state.lastT = Date.now();
-  try{ _histBase = baselineNow(); }catch(e){}
-  state.restorePick=false; updateRestoreUI(); renderHist();
 }
 function applySnapshot(s, withBudget){  Object.keys(state.qty).forEach(k=>state.qty[k]=0); Object.assign(state.qty, s.qty);
   state.prepurchase = JSON.parse(JSON.stringify(s.prepurchase||[])); state.ppEditing=null;
   Object.keys(state.waived).forEach(k=>state.waived[k]=0); Object.assign(state.waived, s.waived);
   if(withBudget){ state.budget=s.budget; const bi=$('#budgetInput'); if(bi) bi.value=(s.budget!=null && s.budget>0)?String(s.budget):''; }
-  document.querySelectorAll('#list .min, #waivedList .min, #waivedMatList .min').forEach(i=>i.value='');
+  document.querySelectorAll('#list .min, #waivedList .min, #waivedEqList .min, #waivedMatList .min').forEach(i=>i.value='');
   RATES.forEach(r=>updateRow(r.id,false)); updateWaivedRows(); renderPrepurchase();
 }
 function buildDeltaState(){
@@ -1081,9 +1079,10 @@ function exportCSV(){
       rows.push([r.name, tier, r.kind==='cost'?'at cost':rateOf(r), (r.kind==='time'||r.kind==='material')?unitOf(r):'', r.kind==='cost'?'':fmtQty(state.qty[r.id]), lineCost(r).toFixed(2), '']);
     }
   });
-  const wt=state.waiveTime?waivedTimeTotal():0, wm=state.waiveMat?waivedMatTotal():0;
+  const wt=(state.waiveTime?waivedTimeTotal():0)+(state.waiveEquip?waivedEquipTotal():0), wm=state.waiveMat?waivedMatTotal():0;
   if(wt+wm>0){ rows.push([]);
     if(state.waiveTime) waivableTime().forEach(r=>{ const h=state.waived[r.id]||0; if(h>0) rows.push([`Waived — ${r.name}`,TIER[state.mode],rateOf(r),unitOf(r),fmtQty(h),(-waivedCost(r)).toFixed(2),'']); });
+    if(state.waiveEquip) waivableEquip().forEach(r=>{ const h=state.waived[r.id]||0; if(h>0) rows.push([`Waived — ${r.name}`,TIER[state.mode],rateOf(r),unitOf(r),fmtQty(h),(-waivedCost(r)).toFixed(2),'']); });
     if(state.waiveMat) waivableMat().forEach(r=>{ const q=state.waived[r.id]||0; if(q>0) rows.push([`Waived — ${r.name}`,TIER[state.mode],rateOf(r),unitOf(r),fmtQty(q),(-waivedCost(r)).toFixed(2),'']); });
     rows.push(['','','','','Subtotal', sumAll().toFixed(2),'']);
     if(wt>0) rows.push(['','','','','Waived staff time',(-wt).toFixed(2),'']);
@@ -1114,7 +1113,7 @@ function resetAll(){
   state.budget=null; state.budgetStatus='undefined'; updateBudgetStatus();
   state.history.unshift({t:Date.now(), reset:true, mode:state.mode, delta:-cleared}); state.lastT = Date.now();
   try{ _histBase = baselineNow(); }catch(e){}
-  document.querySelectorAll('#list .min, #waivedList .min, #waivedMatList .min').forEach(i=>i.value='');
+  document.querySelectorAll('#list .min, #waivedList .min, #waivedEqList .min, #waivedMatList .min').forEach(i=>i.value='');
   const bi=$('#budgetInput'); if(bi) bi.value='';
   RATES.forEach(r=>updateRow(r.id,false)); updateWaivedRows(); recalc(); renderHist(); renderPrepurchase();
   saveNow();   // resets are destructive: persist immediately, never ride the debounce
@@ -1215,6 +1214,8 @@ function syncInputsFromState(){
   var wm=$('#waiveMatChk'); if(wm) wm.checked=state.waiveMat;
   var wd=$('#waived'); if(wd) wd.classList.toggle('hidden', !state.waiveTime);
   var wdm=$('#waivedMat'); if(wdm) wdm.classList.toggle('hidden', !state.waiveMat);
+  var weq=$('#waiveEqChk'); if(weq) weq.checked=state.waiveEquip;
+  var wde=$('#waivedEq'); if(wde) wde.classList.toggle('hidden', !state.waiveEquip);
 }
 
 /* ----- full-app init (standalone + editor modal) ----- */
@@ -1228,16 +1229,14 @@ $('#budgetInput').addEventListener('input',e=>{ const v=parseFloat(e.target.valu
 $('#budgetStatus').addEventListener('change',e=>setBudgetStatus(e.target.value));
 $('#waiveChk').addEventListener('change',e=>{ state.waiveTime=e.target.checked; $('#waived').classList.toggle('hidden', !state.waiveTime); recalc(); });
 $('#waiveMatChk').addEventListener('change',e=>{ state.waiveMat=e.target.checked; $('#waivedMat').classList.toggle('hidden', !state.waiveMat); recalc(); });
+$('#waiveEqChk').addEventListener('change',e=>{ state.waiveEquip=e.target.checked; $('#waivedEq').classList.toggle('hidden', !state.waiveEquip); recalc(); });
 $('#quoteBtn').onclick=generateQuote;
-$('#qEnter').onclick=()=>{ if(!locked()) enterQuoteMode(); };
+$('#qEnter').onclick=()=>{ if(locked()) return; if(state.quoteMode) cancelQuote(); else enterQuoteMode(); };
 $('#qSave').onclick=()=>saveQuote(false);
-$('#qNew').onclick=()=>saveQuote(true);
 $('#qCancel').onclick=cancelQuote;
 $('#exportBtn').onclick=exportCSV;
 $('#ppSumBtn').onclick=copyPpSummary;
 $('#resetBtn').onclick=onResetClick;
-$('#restorePickBtn').onclick=toggleRestorePick;
-$('#histList').addEventListener('click',e=>{ if(!state.restorePick) return; const el=e.target.closest('.he'); if(!el) return; const i=parseInt(el.getAttribute('data-i'),10); if(!isNaN(i)) restoreToIndex(i); });
 $('#histBtn').onclick=()=>{ $('#hist').classList.toggle('hidden'); };
 $('#gearBtn').onclick=()=>{ const hidden=$('#settings').classList.toggle('hidden'); if(!hidden) buildSettings(); };
 $('#setDone').onclick=()=>$('#settings').classList.add('hidden');
@@ -1264,7 +1263,7 @@ _histBase = baselineNow();   // diff baseline for the one-line save summary
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '3.0';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '3.1';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1277,7 +1276,7 @@ function getParam(n){ try{ return new URLSearchParams(location.search).get(n); }
 function serializeState(){
   return { v:1, mode:state.mode, qty:state.qty, pp:state.prepurchase,
     budget:state.budget, bstat:state.budgetStatus,
-    wt:state.waiveTime, wm:state.waiveMat, waived:state.waived,
+    wt:state.waiveTime, we:state.waiveEquip, wm:state.waiveMat, waived:state.waived,
     quoted:state.quoted, qbase:state.quoteBase, bimp:!!state.budgetImported, hby:state.hoursBy||{}, pbs:state.pbs, lt:state.lastT };
 }
 function hydrateState(d){
@@ -1290,7 +1289,7 @@ function hydrateState(d){
   state.budgetStatus = d.bstat || 'undefined';
   state.pbs = (typeof d.pbs==='string') ? d.pbs : undefined;
   state.lastT = (typeof d.lt==='number') ? d.lt : undefined;
-  state.waiveTime = !!d.wt; state.waiveMat = !!d.wm;
+  state.waiveTime = !!d.wt; state.waiveEquip = !!d.we; state.waiveMat = !!d.wm;
   state.waived = (d.waived && typeof d.waived==='object') ? d.waived : {};
   state.quoted = (d.quoted && typeof d.quoted==='object') ? d.quoted : {};
   state.quoteBase = (d.qbase && typeof d.qbase==='object') ? d.qbase : {};
@@ -1298,11 +1297,11 @@ function hydrateState(d){
   state.hoursBy = (d.hby && typeof d.hby==='object') ? d.hby : {};
   return true;
 }
-var SAVE_DELAY = 800, _edBC = null, _canceling = false, _openPayload = null, _histBase = null;
+var SAVE_DELAY = 1500, _edBC = null, _canceling = false, _openPayload = null, _histBase = null;
 function baselineNow(){
   return JSON.parse(JSON.stringify({ qty: state.qty, ppn: (state.prepurchase||[]).length,
     ppsum: (state.prepurchase||[]).reduce(function(a,e){ return a+(e.amount||0); },0),
-    budget: state.budget, mode: state.mode, wsum: waivedApplied() }));
+    budget: state.budget, mode: state.mode, waived: state.waived, wt: state.waiveTime, we: state.waiveEquip, wm: state.waiveMat }));
 }
 function buildSaveEntry(){
   if(!_histBase) return;
@@ -1327,14 +1326,22 @@ function buildSaveEntry(){
       ? (dn > 0 ? '+' : '\u2212') + Math.abs(dn) + ' supply order' + (Math.abs(dn) !== 1 ? 's' : '')
       : 'supply orders changed');
   }
-  var ws = waivedApplied();
-  if(Math.abs(ws - (_histBase.wsum || 0)) > 0.005)
-    parts.push('waived ' + usd.format(_histBase.wsum || 0) + ' \u2192 ' + usd.format(ws));
+  [['wt','waiveTime','Staff Time'],['we','waiveEquip','Equipment Time'],['wm','waiveMat','Materials']].forEach(function(w){
+    var was = !!_histBase[w[0]], now = !!state[w[1]];
+    if(was !== now) parts.push((now ? 'waiving ' : 'stopped waiving ') + w[2]);
+  });
+  RATES.forEach(function(r){
+    var a = (_histBase.waived && _histBase.waived[r.id]) || 0, b = (state.waived && state.waived[r.id]) || 0;
+    var d = Math.round((b - a) * 100) / 100;
+    if(Math.abs(d) < 0.005) return;
+    var unit = r.kind === 'time' ? ' h' : ' g';
+    parts.push('waived ' + r.name + ' ' + fmtQty(a) + ' \u2192 ' + fmtQty(b) + unit);
+  });
   if((_histBase.budget || 0) !== (state.budget || 0))
     parts.push('budget ' + (_histBase.budget ? usd.format(_histBase.budget) : '\u2014') + ' \u2192 ' + (state.budget ? usd.format(state.budget) : '\u2014'));
   if(_histBase.mode !== state.mode) parts.push(TIER[_histBase.mode] + ' \u2192 ' + TIER[state.mode]);
   if(!parts.length) return;
-  var e = { t: Date.now(), sum: true, mode: state.mode, name: parts.join(', '), snap: snapshotState() };
+  var e = { t: Date.now(), sum: true, mode: state.mode, name: parts.join(', ') };
   if(_memberTag) e.by = _memberTag;
   state.history.unshift(e);
   state.lastT = e.t;
@@ -1547,12 +1554,12 @@ function estimateFaceHeight(d){
   if(empty) return 66;
   var left = 2*22 + 6*23;                 // 2 headers + 6 lines
   var right = 2*22 + (3 + pp)*23;         // 2 headers + 3 material lines + orders
-  var h = 98 + Math.max(left, right);     // top row + panel padding + Trello slack
+  var h = 110 + Math.max(left, right);    // top row + panel padding + Trello slack (generous: undershoot = scroll flicker)
   try{
     if(d && typeof d === 'object'){
       if(typeof d.budget === 'number' && d.budget > 0) h += 36;
       var wvAny = d.waived && Object.keys(d.waived).some(function(k){ return d.waived[k] > 0; });
-      if((d.wt || d.wm) && wvAny) h += 20;
+      if((d.wt || d.we || d.wm) && wvAny) h += 20;
       if(typeof d.lt === 'number') h += 16;
     }
   }catch(e){}
