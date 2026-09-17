@@ -249,6 +249,10 @@
     font:inherit; font-size:12px; font-weight:600; padding:5px 7px; border-radius:5px}
   .scratch-banner{display:none;font-size:11px;font-weight:700;letter-spacing:.06em;text-align:center;color:var(--dim);border:1px dashed var(--line);border-radius:6px;padding:6px 8px;margin-bottom:10px}
   html.scratch .scratch-banner{display:block}
+  html.scratch #qEnter, html.scratch #qCancel, html.scratch #qSave, html.scratch .qacts,
+  html.scratch .budget, html.scratch .waived, html.scratch #ppSumBtn, html.scratch #histBtn, html.scratch #hist{display:none !important}
+  html.scratch #scratchClear{display:inline-block}
+  #scratchClear{display:none}
   .qbanner{font-size:13px;font-weight:900;letter-spacing:.18em;text-align:center;color:#1d2125;background:var(--blue);border-radius:6px;padding:6px 0;margin-bottom:8px}
   .hist-bar .link:hover{background:var(--subtle); color:var(--text)}
   .link.armed{color:var(--blue); background:rgba(87,157,255,.16)}
@@ -459,6 +463,7 @@
     <button class="link" id="exportBtn">Export CSV</button>
     <button class="link" id="ppSumBtn">PrePurchasing Summary</button>
     <button class="link" id="histBtn">History (0)</button>
+    <button class="link danger" id="scratchClear">Clear quote</button>
   </div>
   <div class="hist hidden" id="hist">
     <div class="hist-bar"><span class="hist-lbl">Activity history</span><button class="link danger" id="resetBtn">Reset all</button></div>
@@ -1259,7 +1264,7 @@ $('#gearBtn').onclick=()=>{ const hidden=$('#settings').classList.toggle('hidden
 $('#setDone').onclick=()=>$('#settings').classList.add('hidden');
 $('#setRestore').onclick=restoreDefaults;
 $('#saveCloseBtn').onclick=()=>{
-  if(state.quoteMode){ const b=$('#saveCloseBtn'); b.textContent='Finish quote first'; setTimeout(()=>b.textContent='Save',1600); return; }
+  if(state.quoteMode && !_scratch){ const b=$('#saveCloseBtn'); b.textContent='Finish quote first'; setTimeout(()=>b.textContent='Save',1600); return; }
   buildSaveEntry(); saveNow(); setTimeout(()=>{ try{ _t.closeModal(); }catch(e){} }, 150);
 };
 $('#cancelBtn').onclick=()=>{
@@ -1268,6 +1273,12 @@ $('#cancelBtn').onclick=()=>{
   try{ if(_openPayload && _t) storeSet(_openPayload); }catch(e){}
   setTimeout(()=>{ try{ _t.closeModal(); }catch(e){} }, 150);
 };
+if(_scratch){
+  state.budget=null; state.budgetStatus='undefined'; state.waiveTime=false; state.waiveEquip=false; state.waiveMat=false; state.waived={}; state.history=[];
+  syncInputsFromState(); recalc();
+  enterQuoteMode();
+  $('#scratchClear').onclick=()=>{ if(window.confirm('Clear this quick quote?')){ resetAll(); state.history=[]; state.quoteMode=false; state.snapshot=null; enterQuoteMode(); saveNow(); } };
+}
 _ready = true;   // from here on, user edits trigger debounced saveCard()
 _openPayload = JSON.parse(JSON.stringify(savePayload()));   // DEEP copy — serializeState returns live refs
 _histBase = baselineNow();   // diff baseline for the one-line save summary
@@ -1280,7 +1291,7 @@ _histBase = baselineNow();   // diff baseline for the one-line save summary
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '3.3';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '3.4';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1397,7 +1408,7 @@ function saveNow(){
 }
 function saveCard(){
   if(!_ready || !_t) return;
-  if(state.quoteMode) return;   // quote-in-progress must not leak to the card face; persisted on quote save/cancel/exit
+  if(state.quoteMode && !_scratch) return;   // quote-in-progress must not leak to the card face; persisted on quote save/cancel/exit
   clearTimeout(_saveTimer);
   saveChip('Saving\u2026');
   _saveTimer = setTimeout(saveNow, SAVE_DELAY);
@@ -1414,10 +1425,10 @@ function relayFlush(){
   }catch(e){}
 }
 ['pagehide','beforeunload'].forEach(function(ev){
-  window.addEventListener(ev, function(){ if(_saveTimer && !_canceling && !state.quoteMode){ relayFlush(); saveNow(); } });
+  window.addEventListener(ev, function(){ if(_saveTimer && !_canceling && (!state.quoteMode || _scratch)){ relayFlush(); saveNow(); } });
 });
 document.addEventListener('visibilitychange', function(){
-  if(document.visibilityState === 'hidden' && _saveTimer && !_canceling && !state.quoteMode){ relayFlush(); saveNow(); }
+  if(document.visibilityState === 'hidden' && _saveTimer && !_canceling && (!state.quoteMode || _scratch)){ relayFlush(); saveNow(); }
 });
 function loadCard(cb){
   if(!_t){ cb && cb(false); return; }
@@ -1602,7 +1613,7 @@ function initConnector(){
     'board-buttons': function(t, opts){
       return [{
         icon: { dark: TRELLO_ICON, light: TRELLO_ICON },
-        text: 'Quick Quote',
+        text: 'TF-Recharge',
         callback: function(tt){
           return tt.modal({ url: SELF + '?view=editor&scratch=1&cb=' + Date.now(), fullscreen: false, height: 1300, title: '', accentColor: '#242528' });
         }
