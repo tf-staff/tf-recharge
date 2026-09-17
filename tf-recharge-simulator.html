@@ -247,6 +247,8 @@
   .hist-bar .hist-lbl{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--dimmer); font-weight:700}
   .hist-bar .link{appearance:none; border:0; background:transparent; cursor:pointer; color:var(--dim);
     font:inherit; font-size:12px; font-weight:600; padding:5px 7px; border-radius:5px}
+  .scratch-banner{display:none;font-size:11px;font-weight:700;letter-spacing:.06em;text-align:center;color:var(--dim);border:1px dashed var(--line);border-radius:6px;padding:6px 8px;margin-bottom:10px}
+  html.scratch .scratch-banner{display:block}
   .qbanner{font-size:13px;font-weight:900;letter-spacing:.18em;text-align:center;color:#1d2125;background:var(--blue);border-radius:6px;padding:6px 0;margin-bottom:8px}
   .hist-bar .link:hover{background:var(--subtle); color:var(--text)}
   .link.armed{color:var(--blue); background:rgba(87,157,255,.16)}
@@ -374,6 +376,7 @@
 </div>
 <div id="verBadge"></div>
 <div class="panel">
+  <div class="scratch-banner">QUICK QUOTE &mdash; not attached to any card &middot; saved privately for you on this board</div>
   <div class="head">
     <div class="seg" role="group" aria-label="Rate tier">
       <button id="modeUcd" aria-pressed="true">Internal</button>
@@ -1262,7 +1265,7 @@ $('#saveCloseBtn').onclick=()=>{
 $('#cancelBtn').onclick=()=>{
   _canceling = true;
   clearTimeout(_saveTimer); _saveTimer = null;
-  try{ if(_openPayload && _t) _t.set('card','shared', _openPayload); }catch(e){}
+  try{ if(_openPayload && _t) storeSet(_openPayload); }catch(e){}
   setTimeout(()=>{ try{ _t.closeModal(); }catch(e){} }, 150);
 };
 _ready = true;   // from here on, user edits trigger debounced saveCard()
@@ -1277,7 +1280,7 @@ _histBase = baselineNow();   // diff baseline for the one-line save summary
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '3.2';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '3.3';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1327,7 +1330,7 @@ function buildSaveEntry(){
     if(Math.abs(d) < 0.005) return;
     var unit = r.kind === 'time' ? ' h ' : (r.id === 'moth' ? ' $ ' : ' g ');
     parts.push((d > 0 ? '+' : '\u2212') + fmtQty(Math.abs(d)) + unit + r.name);
-    if(r.group === 'Staff Time' && r.kind === 'time' && _memberTag){
+    if(!_scratch && r.group === 'Staff Time' && r.kind === 'time' && _memberTag){
       state.hoursBy = state.hoursBy || {};
       var nv = Math.round(((state.hoursBy[_memberTag] || 0) + d) * 100) / 100;
       if(Math.abs(nv) < 0.005) delete state.hoursBy[_memberTag]; else state.hoursBy[_memberTag] = nv;
@@ -1384,7 +1387,7 @@ function saveNow(){
   if(!_t || _canceling) return;
   clearTimeout(_saveTimer); _saveTimer = null;
   try{
-    var p = _t.set('card','shared', savePayload());
+    var p = storeSet(savePayload());
     saveChip('Saving\u2026');
     if(p && p.then){
       p.then(function(){ saveChip('Saved \u2713','ok'); setTimeout(function(){ saveChip(''); }, 2500); },
@@ -1404,6 +1407,7 @@ function saveCard(){
    this iframe and performs the same t.set from safety. Duplicate writes are
    idempotent (same payload), so both paths may land harmlessly. */
 function relayFlush(){
+  if(_scratch) return;
   try{
     if(!_edBC) _edBC = new BroadcastChannel('tf-rt');
     _edBC.postMessage({ type:'save', data: savePayload() });
@@ -1419,8 +1423,8 @@ function loadCard(cb){
   if(!_t){ cb && cb(false); return; }
   var done=false, finish=function(ok){ if(done) return; done=true; cb && cb(ok); };
   try{
-    var pd = _t.get('card','shared','rt');
-    var ph = _t.get('card','shared','rt_h');
+    var pd = storeGet(ST.rt);
+    var ph = storeGet(ST.h);
     if(pd && pd.then){
       Promise.all([
         pd.catch(function(){ return null; }),
@@ -1595,6 +1599,15 @@ function initConnector(){
     };
   }catch(e){}
   window.TrelloPowerUp.initialize({
+    'board-buttons': function(t, opts){
+      return [{
+        icon: { dark: TRELLO_ICON, light: TRELLO_ICON },
+        text: 'Quick Quote',
+        callback: function(tt){
+          return tt.modal({ url: SELF + '?view=editor&scratch=1&cb=' + Date.now(), fullscreen: false, height: 1300, title: '', accentColor: '#242528' });
+        }
+      }];
+    },
     'card-back-section': function(t, opts){
       _lastCardT = t;   // the currently open card's working handle
       var buildSection = function(dataStr){
@@ -1715,6 +1728,13 @@ function initSummary(){
 }
 
 var _memberTag = null;
+var _scratch = false;                          // board-level quick quote (no card attached)
+var ST = { scope:'card', vis:'shared', rt:'rt', h:'rt_h' };
+function storeGet(key){ return _t.get(ST.scope, ST.vis, key); }
+function storeSet(payload){
+  var obj = {}; Object.keys(payload).forEach(function(k){ obj[k === 'rt' ? ST.rt : (k === 'rt_h' ? ST.h : k)] = payload[k]; });
+  return _t.set(ST.scope, ST.vis, obj);
+}
 function memberTagFrom(m){
   var n = ((m && (m.fullName || m.username)) || '').trim();
   if(!n) return null;
@@ -1724,6 +1744,11 @@ function memberTagFrom(m){
 }
 function initEditor(){
   try{ _t = window._t = window.TrelloPowerUp.iframe(); }catch(e){ _t=null; }
+  if(getParam('scratch') === '1'){
+    _scratch = true;
+    ST = { scope:'board', vis:'private', rt:'rtq', h:'rtq_h' };   // per-member scratch pad on this board
+    document.documentElement.classList.add('scratch');
+  }
   try{
     var pm = _t && _t.member ? _t.member('fullName','username') : null;
     if(pm && pm.then) pm.then(function(m){ _memberTag = memberTagFrom(m); }, function(){});
