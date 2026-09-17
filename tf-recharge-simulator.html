@@ -250,7 +250,14 @@
   .scratch-banner{display:none;font-size:11px;font-weight:700;letter-spacing:.06em;text-align:center;color:var(--dim);border:1px dashed var(--line);border-radius:6px;padding:6px 8px;margin-bottom:10px}
   html.scratch .scratch-banner{display:block}
   html.scratch #qEnter, html.scratch #qCancel, html.scratch #qSave, html.scratch .qacts,
-  html.scratch .budget, html.scratch .waived, html.scratch #ppSumBtn, html.scratch #histBtn, html.scratch #hist{display:none !important}
+  html.scratch .budget, html.scratch .waived, html.scratch #ppSumBtn, html.scratch #histBtn, html.scratch #hist,
+  html.scratch #qActive, html.scratch #exportBtn, html.scratch #cancelBtn{display:none !important}
+  html.scratch .foot{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding-top:12px}
+  html.scratch .foot .link{font-size:14px;font-weight:800;padding:13px 10px;border-radius:8px;text-align:center}
+  html.scratch #quoteBtn{background:var(--blue);color:#1d2125}
+  html.scratch #quoteBtn:hover{filter:brightness(1.08);color:#1d2125}
+  html.scratch #scratchClear{background:var(--subtle);color:var(--text)}
+  html.scratch #scratchClear:hover{background:var(--subtle-h)}
   html.scratch #scratchClear{display:inline-block}
   #scratchClear{display:none}
   .qbanner{font-size:13px;font-weight:900;letter-spacing:.18em;text-align:center;color:#1d2125;background:var(--blue);border-radius:6px;padding:6px 0;margin-bottom:8px}
@@ -380,7 +387,7 @@
 </div>
 <div id="verBadge"></div>
 <div class="panel">
-  <div class="scratch-banner">QUICK QUOTE &mdash; not attached to any card &middot; saved privately for you on this board</div>
+  <div class="scratch-banner">QUICK QUOTE</div>
   <div class="head">
     <div class="seg" role="group" aria-label="Rate tier">
       <button id="modeUcd" aria-pressed="true">Internal</button>
@@ -463,7 +470,7 @@
     <button class="link" id="exportBtn">Export CSV</button>
     <button class="link" id="ppSumBtn">PrePurchasing Summary</button>
     <button class="link" id="histBtn">History (0)</button>
-    <button class="link danger" id="scratchClear">Clear quote</button>
+    <button class="link" id="scratchClear">Reset</button>
   </div>
   <div class="hist hidden" id="hist">
     <div class="hist-bar"><span class="hist-lbl">Activity history</span><button class="link danger" id="resetBtn">Reset all</button></div>
@@ -987,7 +994,7 @@ async function copyQuote(plain, html){
 async function generateQuote(){
   const groups=quoteData(); const ok=await copyQuote(quotePlain(groups), quoteHtml(groups));
   const btn=$('#quoteBtn'); btn.textContent = ok ? 'Copied \u2713' : 'Copy blocked';
-  setTimeout(()=>btn.textContent='Generate Summary', 1700);
+  setTimeout(()=>btn.textContent=(_scratch?'Copy Quote':'Generate Summary'), 1700);
   if(!ok) window.prompt('Copy the quote below:', quotePlain(groups));
 }
 
@@ -1277,7 +1284,9 @@ if(_scratch){
   state.budget=null; state.budgetStatus='undefined'; state.waiveTime=false; state.waiveEquip=false; state.waiveMat=false; state.waived={}; state.history=[];
   syncInputsFromState(); recalc();
   enterQuoteMode();
-  $('#scratchClear').onclick=()=>{ if(window.confirm('Clear this quick quote?')){ resetAll(); state.history=[]; state.quoteMode=false; state.snapshot=null; enterQuoteMode(); saveNow(); } };
+  $('#quoteBtn').textContent='Copy Quote';
+  $('#saveCloseBtn').textContent='Close';
+  $('#scratchClear').onclick=()=>{ resetAll(); state.history=[]; state.quoteMode=false; state.snapshot=null; enterQuoteMode(); };
 }
 _ready = true;   // from here on, user edits trigger debounced saveCard()
 _openPayload = JSON.parse(JSON.stringify(savePayload()));   // DEEP copy — serializeState returns live refs
@@ -1291,7 +1300,7 @@ _histBase = baselineNow();   // diff baseline for the one-line save summary
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '3.4';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '3.5';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1741,8 +1750,9 @@ function initSummary(){
 var _memberTag = null;
 var _scratch = false;                          // board-level quick quote (no card attached)
 var ST = { scope:'card', vis:'shared', rt:'rt', h:'rt_h' };
-function storeGet(key){ return _t.get(ST.scope, ST.vis, key); }
+function storeGet(key){ if(_scratch) return Promise.resolve(undefined); return _t.get(ST.scope, ST.vis, key); }
 function storeSet(payload){
+  if(_scratch) return Promise.resolve();   // quick quotes are ephemeral: nothing is stored
   var obj = {}; Object.keys(payload).forEach(function(k){ obj[k === 'rt' ? ST.rt : (k === 'rt_h' ? ST.h : k)] = payload[k]; });
   return _t.set(ST.scope, ST.vis, obj);
 }
