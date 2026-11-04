@@ -146,8 +146,8 @@ whole block (one order per line + `Total — $X`). Unlock restores `pbs`.
   refreshed after quote save / reset). Enters quote mode with only the delta loaded and the bill
   reverted to open-time; `state.convFrom` holds the full pre-convert bill so quote **Cancel** puts
   the entries back. Save Quote: `qbase` = open-time qty (remain counters count usage above it),
-  budget = already-billed net total + quote total. Disabled when there is no delta. No title, no "Saved" chip
-  (retired v2.6). Panel is borderless, `max-width:690px`.
+  budget = already-billed net total + quote total. Disabled when there is no delta.
+- No title, no "Saved" chip (retired v2.6). Panel is borderless, `max-width:690px`.
 - **Save** = `buildSaveEntry()` (one summary history line from a diff against the baseline
   captured at open) + `saveNow()` + `closeModal`. Refused during quote mode ("Finish quote
   first").
