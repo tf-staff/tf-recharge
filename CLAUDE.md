@@ -3,7 +3,7 @@
 Tech Foundry's billable-activity tracker: a Trello Power-Up that lives on the back of each
 project card (compact summary) with a full editor modal, plus a board-level Quick Quote.
 Owner: Steven Lucero (Director, UC Davis Tech Foundry). Staff users: Steven, Valerie Bravo,
-Tristan Adams. Current release: **v3.5** (`var VERSION = '3.5'` in the HTML).
+Tristan Adams. Current release: **v3.6** (`var VERSION = '3.6'` in the HTML).
 
 This file is the hand-off from ~5 months of chat-based development (Jun–Sep 2026). Read it
 before changing anything; most of what follows was learned the hard way.
@@ -77,7 +77,7 @@ overflow. Next lever if asked: only save on explicit Save.
 
 `rt` = `serializeState()`:
 ```
-{ v:1, mode:'ucd'|'nonuc', qty:{<rateId>:number}, pp:[{id,url,amount}],
+{ v:1, mode:'ucd'|'nonuc'|'nc', qty:{<rateId>:number}, pp:[{id,url,amount,desc?}],   // desc ≤80 chars, omitted when empty
   budget:number|null, bstat:'undefined'|'calculated'|'shared'|'approved'|'billing',
   wt, we, wm: bool (waive Staff / Equipment / Materials), waived:{<rateId>:qty},
   quoted:{}, qbase:{},            // quote-mode "remain" counters
@@ -89,7 +89,7 @@ overflow. Next lever if asked: only save on explicit Save.
 `rt_h` = `serializeHist()`: history entries stripped of snapshots, **byte-budgeted to ~2,300
 chars / 40 entries** (oldest trimmed). Entry kinds: `{sum:true, name:'+1.5 h Engineer, …',
 by, mode}` (one per explicit Save), `{note:true, name, detail}` (quote saved, budget import,
-restore), `{reset:true, delta}`. Per-edit entries were **retired in v2.9**; `logHist()` is an
+restore), `{reset:true, delta}`, `{cmt:true, name:<comment ≤160>, by, mode}` (Session Comments, v3.6). Per-edit entries were **retired in v2.9**; `logHist()` is an
 intentional no-op kept for call-site compatibility.
 
 Member identity: editor calls `t.member('fullName','username')` → `memberTagFrom()` →
@@ -110,7 +110,9 @@ Member identity: editor calls `t.member('fullName','username')` → `memberTagFr
 | moth | Other | $1 | $2 | material | Materials | 5 |
 | prepurch | PrePurchasing/Pass-Thru | at cost | at cost | prepurchase | Supplies | 0 |
 
-`TIER = {ucd:'Internal', nonuc:'External'}`. Minimums apply in quote mode (lines below
+`TIER = {ucd:'Internal', nonuc:'External', nc:'No Charge'}`. **No Charge** (v3.6): `rateOf()`
+returns 0 for every rate incl. supplies multiplier, so quantities are tracked but total is $0; supply
+orders still display their entered amounts. Face status label shows "No Charge". Minimums apply in quote mode (lines below
 minimum flag `qminHint`).
 
 ## 6. Card face (summary view) — what it shows, in order
@@ -136,8 +138,15 @@ whole block (one order per line + `Total — $X`). Unlock restores `pbs`.
 
 ## 7. Editor (modal) — conventions
 
-- Header row: Internal/External segmented toggle (left), **Enter Quote Mode** centered
-  (absolute-positioned), gear + **Save** + **Cancel** (right). No title, no "Saved" chip
+- Header row: Internal/External/No Charge segmented toggle (left), gear + **Save** + **Cancel**
+  (right); second row centered: **Enter Quote Mode** + **Convert Session Entries to Quote**.
+- **Session Comments** textarea under the header (160-char cap, live "n characters remaining").
+  Logged as a `cmt` history entry on **Save** only (Cancel / X-close discard it).
+- **Convert Session Entries to Quote** (v3.6): "session" = delta vs `_sessBase` (captured at open,
+  refreshed after quote save / reset). Enters quote mode with only the delta loaded and the bill
+  reverted to open-time; `state.convFrom` holds the full pre-convert bill so quote **Cancel** puts
+  the entries back. Save Quote: `qbase` = open-time qty (remain counters count usage above it),
+  budget = already-billed net total + quote total. Disabled when there is no delta. No title, no "Saved" chip
   (retired v2.6). Panel is borderless, `max-width:690px`.
 - **Save** = `buildSaveEntry()` (one summary history line from a diff against the baseline
   captured at open) + `saveNow()` + `closeModal`. Refused during quote mode ("Finish quote
@@ -161,7 +170,7 @@ whole block (one order per line + `Total — $X`). Unlock restores `pbs`.
 In scratch mode: `_scratch=true`, `storeGet` returns nothing and `storeSet` is a no-op
 (**ephemeral — nothing is ever read or written**), relay disabled, no `hby` attribution,
 forced into quote mode with the banner panel hidden, budget/waivers/history/PP summary/
-Export CSV/Cancel hidden, footer becomes two large buttons **Copy Quote** (= Generate Summary)
+Export CSV/Cancel/Session Comments/Convert hidden, footer becomes two large buttons **Copy Quote** (= Generate Summary)
 and **Reset**; header Save reads **Close**. Banner text is just "QUICK QUOTE". Stale `rtq`/
 `rtq_h` board-private keys from v3.3–3.4 may exist on the board; they are inert.
 
@@ -223,7 +232,9 @@ second block and a naive extractor only checks the first.
   copiers, status label; 2.9 quote leak fix, theme-in-URL, last-entry date, Save-summary
   history, $160 external rate, importer race; 3.0 reset-baseline bugs, supplies block copy;
   3.1 equipment waivers, quote-mode relabel/banner, roll-back + new-charges removed, flicker
-  mitigation; 3.2 pre-boot hiding; 3.3–3.5 board-button Quick Quote, ephemeral.
+  mitigation; 3.2 pre-boot hiding; 3.3–3.5 board-button Quick Quote, ephemeral; 3.6 No Charge tier,
+  supply descriptions (editor/face/copy/quote/CSV, +16 px per described order in the height
+  estimate), Session Comments, Convert Session Entries to Quote.
 
 ## 13. Backlog / open items
 

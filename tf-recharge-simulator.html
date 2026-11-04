@@ -38,8 +38,20 @@
   .panel{max-width:690px; margin:0 auto; background:var(--panel); position:relative;
     border:none; border-radius:10px; padding:12px 18px 10px;}
 
-  .head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:4px; position:relative}
-  .qenter.head-center{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%)}
+  .head{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:4px; position:relative}
+  .head-center{display:flex; align-items:center; justify-content:center; gap:8px; order:3; flex:1 1 100%; margin-top:2px}
+  .qenter.qconv:disabled{opacity:.4; cursor:not-allowed; background:rgba(87,157,255,.06)}
+  .panel.qmode-on .qconv{display:none}
+  .cmt-row{position:relative; margin:8px 0 2px; padding:0 2px}
+  .cmt{display:block; width:100%; resize:none; font:inherit; font-size:12.5px; line-height:1.4; padding:6px 8px 16px;
+    color:var(--text); background:var(--bg); border:1px solid var(--line); border-radius:5px}
+  .cmt::placeholder{color:var(--dimmer)}
+  .cmt:focus{outline:0; border-color:var(--blue)}
+  .cmt-left{position:absolute; right:10px; bottom:4px; font-size:10.5px; color:var(--dimmer); pointer-events:none}
+  .cmt-left.low{color:#f5cd47}
+  .cmt-left.zero{color:#f87168}
+  .panel.locked .cmt-row{opacity:.6}
+  html.scratch .cmt-row, html.scratch .head-center{display:none !important}
   .savechip{font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;border:1px solid var(--line);color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap}
   .savechip.ok{color:var(--green);border-color:rgba(75,206,151,.45)}
   .savechip.err{color:#f87168;border-color:rgba(248,113,104,.45)}
@@ -47,7 +59,7 @@
   .title .dollar{font-size:15px; line-height:1; color:var(--text)}
   .seg{display:inline-flex; background:var(--subtle); border-radius:6px; padding:2px; gap:2px}
   .seg button{appearance:none; border:0; background:transparent; color:var(--dim); cursor:pointer;
-    font:inherit; font-size:12px; font-weight:600; padding:4px 12px; border-radius:5px}
+    font:inherit; font-size:12px; font-weight:600; padding:4px 12px; border-radius:5px; white-space:nowrap}
   .seg button[aria-pressed="true"]{background:var(--blue); color:#1d2125}
   .seg button:focus-visible{outline:2px solid var(--blue); outline-offset:1px}
 
@@ -98,6 +110,10 @@
   .panel.locked .binput{opacity:.6}
   .panel.locked .seg{opacity:.6; pointer-events:none}
   .panel.locked .qenter{opacity:.5; pointer-events:none}
+  .ictl3 > .ppdescin{grid-column:1 / 4}
+  .ppe .ppdesc{grid-column:1 / -1; font-size:11.5px; color:var(--dimmer); padding:0 8px 2px; margin-top:-2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .ppe.editing{flex-wrap:wrap}
+  .ppe.editing .ppdescin{flex:1 1 100%; text-align:left}
   .rowedit{appearance:none; border:0; background:transparent; cursor:pointer; color:#6b7886;
     font-size:13px; line-height:1; padding:3px 5px; border-radius:4px; flex:0 0 auto}
   .rowedit:hover{color:var(--text); background:var(--subtle)}
@@ -279,6 +295,8 @@
   .hist .he .hn small{color:var(--dimmer); margin-left:5px}
   .hist .he .hn small .qflag{color:var(--blue); font-weight:700}
   .hist .he.quoted{border-left:2px solid var(--blue)}
+  .hist .he.cmt .hn{white-space:normal; color:var(--text); overflow-wrap:anywhere}
+  .hist .he.cmt .hd{color:var(--dimmer)}
   .hist .he .hd{flex:0 0 auto; font-weight:600}
   .hist .he .hd.pos{color:var(--green)} .hist .he .hd.neg{color:#f87168}
   .hist .he.hby{border-left:3px solid var(--blue); background:var(--subtle)}
@@ -370,6 +388,7 @@
   .fc-qbox.nz{color:#579dff;border-color:rgba(87,157,255,.55);font-weight:700}
   .fc-qbox{min-width:26px;text-align:center;font-size:11px;font-variant-numeric:tabular-nums;border:1px solid var(--rt-line,#46474b);background:var(--rt-btn,rgba(255,255,255,.06));color:var(--rt-text,#cecfd2);border-radius:4px;padding:1.5px 4px}
   .fc-name{font-size:12px;font-weight:600;color:var(--rt-text,#cecfd2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fc-ppdesc{font-size:10.5px;color:var(--rt-subtle,#96999e);padding:0 0 1px 33px;margin-top:-1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .fc-name i{font-style:normal;font-weight:500;font-size:10px;color:var(--rt-subtle,#96999e);margin-left:4px}
   .fc-last{text-align:right;font-size:10px;color:var(--rt-subtle,#96999e);opacity:.8;margin-top:6px;font-variant-numeric:tabular-nums}
   .fc-extra{display:flex;justify-content:space-between;font-size:11px;color:var(--rt-subtle,#96999e);margin-top:5px}
@@ -392,13 +411,22 @@
     <div class="seg" role="group" aria-label="Rate tier">
       <button id="modeUcd" aria-pressed="true">Internal</button>
       <button id="modeNon" aria-pressed="false">External</button>
+      <button id="modeNc" aria-pressed="false">No Charge</button>
     </div>
-    <button class="qenter head-center" id="qEnter">Enter Quote Mode</button>
+    <div class="head-center">
+      <button class="qenter" id="qEnter">Enter Quote Mode</button>
+      <button class="qenter qconv" id="qConvert" title="Move the entries made since this editor opened into a quote">Convert Session Entries to Quote</button>
+    </div>
     <div class="head-right">
       <button class="gear" id="gearBtn" title="Rate settings" aria-label="Rate settings">&#9881;</button>
       <button class="qbtn save" id="saveCloseBtn" title="Save and close">Save</button>
       <button class="qbtn cancel" id="cancelBtn" title="Discard changes made since opening, then close">Cancel</button>
     </div>
+  </div>
+
+  <div class="cmt-row">
+    <textarea id="sessCmt" class="cmt" maxlength="160" rows="2" placeholder="Session comments (optional) — logged to history on Save" aria-label="Session comments"></textarea>
+    <span class="cmt-left num" id="cmtLeft">160 characters remaining</span>
   </div>
 
   <div class="list" id="list"></div>
@@ -508,7 +536,7 @@ const RATES = [
 const DEFAULTS = { groups:[...GROUPS], rates:RATES.map(r=>({...r})) };
 const QUICK = { time:[0.25,0.5,1], material:[1,10,100] };
 function quickInc(r){ return (Array.isArray(r.quick) && r.quick.length) ? r.quick : (QUICK[r.kind]||QUICK.time); }
-const TIER = { ucd:'Internal', nonuc:'External' };
+const TIER = { ucd:'Internal', nonuc:'External', nc:'No Charge' };
 const MAT_PER = 1;
 const meta = {
   time:        { ph:'hours',   suf:'h' },
@@ -517,16 +545,17 @@ const meta = {
   prepurchase: { ph:'$',       suf:'' },
 };
 
-const state = { mode:'ucd', qty:{}, history:[], prepurchase:[], ppEditing:null, budget:null, budgetStatus:'undefined', waiveTime:false, waiveEquip:false, waiveMat:false, waived:{}, quoteMode:false, snapshot:null, quoted:{}, quoteBase:{} };
+const state = { convFrom:null, mode:'ucd', qty:{}, history:[], prepurchase:[], ppEditing:null, budget:null, budgetStatus:'undefined', waiveTime:false, waiveEquip:false, waiveMat:false, waived:{}, quoteMode:false, snapshot:null, quoted:{}, quoteBase:{} };
 RATES.forEach(r => state.qty[r.id] = 0);
 let idSeq = 1000;
 const refs = {}, groupRefs = {}, wrefs = {};
-let ppIdInput, ppAmtInput, ppListEl;
+let ppIdInput, ppAmtInput, ppDescInput, ppListEl;
+const PP_DESC_MAX = 80;   // keeps pluginData well under the 4,096-char cap
 const $ = s => document.querySelector(s);
 const usd = new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'});
 const fmtQty = n => { const v=Math.round(n*100)/100; return Number.isInteger(v)?v.toString():v.toFixed(2).replace(/0$/,'').replace(/\.$/,''); };
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const rateOf = r => state.mode==='ucd' ? r.ucd : r.nonuc;
+const rateOf = r => state.mode==='nc' ? 0 : (state.mode==='ucd' ? r.ucd : r.nonuc);   // No Charge: quantities tracked, nothing billed
 function lineCost(r){
   if(r.kind==='cost') return state.qty[r.id]*rateOf(r);
   if(r.kind==='material') return state.qty[r.id]/MAT_PER*rateOf(r);
@@ -548,6 +577,7 @@ function ensureWaivedKeys(){ [...waivableTime(),...waivableEquip(),...waivableMa
 function unitOf(r){ return (r.unit!=null && String(r.unit).trim()!=='') ? r.unit : '$'; }
 function rateLabel(r){
   if(r.kind==='time'||r.kind==='material'){ const u=unitOf(r); return u==='$' ? '$' : '$'+rateOf(r)+'/'+u; }
+  if(state.mode==='nc') return 'no charge';
   const m=rateOf(r); return m===1 ? 'at cost' : 'at cost \u00d7'+fmtQty(m);
 }
 
@@ -581,7 +611,7 @@ function build(){
   const list=$('#list'); list.innerHTML='';
   Object.keys(refs).forEach(k=>delete refs[k]);
   Object.keys(groupRefs).forEach(k=>delete groupRefs[k]);
-  ppIdInput=ppAmtInput=ppListEl=null;
+  ppIdInput=ppAmtInput=ppDescInput=ppListEl=null;
   GROUPS.forEach(g=>{
     const gh=document.createElement('div'); gh.className='ghead';
     gh.innerHTML=`<span class="gname">${esc(g)}</span><span class="gsub">subtotal <b class="num">$0.00</b></span>`;
@@ -624,12 +654,14 @@ function buildRow(r,list){
   if(isPre){
     ppIdInput=document.createElement('input'); ppIdInput.className='min idf'; ppIdInput.type='text'; ppIdInput.placeholder='ID'; ppIdInput.setAttribute('aria-label','PrePurchasing ID'); attachIdPaste(ppIdInput);
     ppAmtInput=document.createElement('input'); ppAmtInput.className='min'; ppAmtInput.type='text'; ppAmtInput.inputMode='decimal'; ppAmtInput.placeholder='$'; ppAmtInput.setAttribute('aria-label','PrePurchasing amount');
+    ppDescInput=document.createElement('input'); ppDescInput.className='min idf ppdescin'; ppDescInput.type='text'; ppDescInput.maxLength=PP_DESC_MAX; ppDescInput.placeholder='Description (optional)'; ppDescInput.setAttribute('aria-label','PrePurchasing description');
+    ppDescInput.addEventListener('keydown',e=>{ if(e.key==='Enter') addPrepurchase(); });
     const add=document.createElement('button'); add.className='add'; add.textContent='+'; add.title='Add entry'; add.onclick=addPrepurchase;
     ppAmtInput.addEventListener('keydown',e=>{ if(e.key==='Enter') addPrepurchase(); });
     ppIdInput.addEventListener('keydown',e=>{ if(e.key==='Enter') ppAmtInput.focus(); });
     const idcell=document.createElement('div'); idcell.className='ppincell'; idcell.appendChild(mkPasteBtn(ppIdInput, ppAmtInput)); idcell.appendChild(ppIdInput);
     const right=document.createElement('div'); right.className='rowright'; right.appendChild(costEl);
-    ictl.appendChild(idcell); ictl.appendChild(ppAmtInput); ictl.appendChild(add); ictl.appendChild(right);
+    ictl.appendChild(idcell); ictl.appendChild(ppAmtInput); ictl.appendChild(add); ictl.appendChild(right); ictl.appendChild(ppDescInput);
     qhost=null;
   } else {
     const left=document.createElement('div'); left.className='rowleft';
@@ -683,8 +715,10 @@ function addPrepurchase(){
   if(!ppIdInput||!ppAmtInput) return;
   const parsed=parseIdText(ppIdInput.value); const label=parsed.label||parsed.url||'';
   const v=parseFloat(ppAmtInput.value); if(isNaN(v)||v===0) return;
-  state.prepurchase.push({id:label, url:parsed.url, amount:v});
-  ppIdInput.value=''; ppAmtInput.value=''; ppIdInput.focus();
+  const desc=ppDescInput ? ppDescInput.value.trim().slice(0,PP_DESC_MAX) : '';
+  const ent={id:label, url:parsed.url, amount:v}; if(desc) ent.desc=desc;
+  state.prepurchase.push(ent);
+  ppIdInput.value=''; ppAmtInput.value=''; if(ppDescInput) ppDescInput.value=''; ppIdInput.focus();
   updatePrepurchRow(); recalc(); renderHist(); renderPrepurchase();
 }
 function updatePrepurchRow(){ const r=RATES.find(x=>x.kind==='prepurchase'); if(r) updateRow(r.id,true); }
@@ -736,18 +770,20 @@ function renderPrepurchase(){
     if(state.ppEditing===i){
       const idi=document.createElement('input'); idi.className='min idf'; idi.type='text'; idi.value= entry.url ? `[${entry.id}](${entry.url})` : (entry.id||''); idi.placeholder='ID'; attachIdPaste(idi);
       const ami=document.createElement('input'); ami.className='min'; ami.type='text'; ami.inputMode='decimal'; ami.value=(entry.amount||0).toFixed(2); ami.placeholder='$';
+      const dsi=document.createElement('input'); dsi.className='min idf ppdescin'; dsi.type='text'; dsi.maxLength=PP_DESC_MAX; dsi.value=entry.desc||''; dsi.placeholder='Description (optional)';
       const sv=document.createElement('button'); sv.className='add'; sv.innerHTML='&#10003;'; sv.title='Save';
       const save=()=>{ const old=entry.amount||0; const v=parseFloat(ami.value);
         if(isNaN(v)||v===0){ state.prepurchase.splice(i,1); }
-        else { const p=parseIdText(idi.value); entry.id=p.label||p.url||''; entry.url=p.url; entry.amount=v; }
+        else { const p=parseIdText(idi.value); entry.id=p.label||p.url||''; entry.url=p.url; entry.amount=v;
+          const dv=dsi.value.trim().slice(0,PP_DESC_MAX); if(dv) entry.desc=dv; else delete entry.desc; }
         state.ppEditing=null; updatePrepurchRow(); recalc(); renderHist(); renderPrepurchase(); };
       sv.onclick=save;
       const del=document.createElement('button'); del.className='ppdel'; del.innerHTML='&#128465;&#xFE0E;'; del.title='Delete entry';
       del.onclick=()=>{ state.prepurchase.splice(i,1); state.ppEditing=null; updatePrepurchRow(); recalc(); renderHist(); renderPrepurchase(); };
-      ami.addEventListener('keydown',ev=>{ if(ev.key==='Enter') save(); if(ev.key==='Escape'){ state.ppEditing=null; renderPrepurchase(); } });
+      [ami,dsi].forEach(x=>x.addEventListener('keydown',ev=>{ if(ev.key==='Enter') save(); if(ev.key==='Escape'){ state.ppEditing=null; renderPrepurchase(); } }));
       row.classList.add('editing');
       const idcell=document.createElement('div'); idcell.className='ppincell'; idcell.appendChild(mkPasteBtn(idi, ami)); idcell.appendChild(idi);
-      row.appendChild(idcell); row.appendChild(ami); row.appendChild(sv); row.appendChild(del);
+      row.appendChild(idcell); row.appendChild(ami); row.appendChild(sv); row.appendChild(del); row.appendChild(dsi);
       ppListEl.appendChild(row); setTimeout(()=>idi.focus(),0);
     } else {
       let ids;
@@ -760,6 +796,7 @@ function renderPrepurchase(){
       const amt=document.createElement('span'); amt.className='ppamt num'; amt.textContent=usd.format(entry.amount||0);
       const ed=document.createElement('button'); ed.className='ppedit'; ed.innerHTML='&#9998;'; ed.title='Edit entry'; ed.onclick=()=>{ state.ppEditing=i; renderPrepurchase(); };
       row.appendChild(idwrap); row.appendChild(amt); row.appendChild(ed);
+      if(entry.desc){ const ds=document.createElement('div'); ds.className='ppdesc'; ds.textContent=entry.desc; ds.title=entry.desc; row.appendChild(ds); }
       ppListEl.appendChild(row);
     }
   });
@@ -855,9 +892,9 @@ function recalc(){
     const dn=(state.quoteMode && state.snapshot)? withDelta(()=>netTotal()) : full;
     const qn=$('#qmodeNew'), qw=$('#qmodeNewWrap');
     if(qn) qn.textContent=usd.format(dn);
-    if(qw) qw.style.display=(state.quoteMode && Math.abs(dn-full)>0.005)?'':'none';
+    if(qw) qw.style.display=(state.quoteMode && !state.convFrom && Math.abs(dn-full)>0.005)?'':'none';
   }
-  updateWaivedRows(); updateBudget();
+  updateWaivedRows(); updateBudget(); updateConvertBtn();
   if(state.quoteMode){ const bad=anyBelowMin();
     const sv=$('#qSave'), nw=null, hint=$('#qminHint');
     const full=netTotal();
@@ -906,6 +943,7 @@ function renderHist(){
     const ts=`<span class="ts"><span class="tsd num">${date}</span><span class="tst num">${time}</span></span>`;
     const di=` data-i="${i}"`;
     if(e.sum) return `<div class="he"${di}>${ts}<span class="hn">${esc(e.name)}<small>${TIER[e.mode]||''}${e.by?' \u00b7 '+esc(e.by):''}</small></span><span class="hd num">Saved</span></div>`;
+    if(e.cmt) return `<div class="he cmt"${di}>${ts}<span class="hn">${esc(e.name)}<small>Comment${e.by?' \u00b7 '+esc(e.by):''}</small></span><span class="hd num">Comment</span></div>`;
     if(e.reset) return `<div class="he reset"${di}>${ts}<span class="hn">Cleared all values</span><span class="hd num neg">${usd.format(e.delta||0)}</span></div>`;
     if(e.note) return `<div class="he reset"${di}>${ts}<span class="hn">${esc(e.name)}</span><span class="hd num">${esc(e.detail||'')}</span></div>`;
     const sign=e.delta>0?'pos':'neg';
@@ -918,7 +956,7 @@ function renderHist(){
 }
 
 function setMode(m){ state.mode=m;
-  $('#modeUcd').setAttribute('aria-pressed',m==='ucd'); $('#modeNon').setAttribute('aria-pressed',m==='nonuc');
+  $('#modeUcd').setAttribute('aria-pressed',m==='ucd'); $('#modeNon').setAttribute('aria-pressed',m==='nonuc'); $('#modeNc').setAttribute('aria-pressed',m==='nc');
   $('#modeLabel').textContent=TIER[m]; updateRates(); recalc(); }
 
 /* ----- quote ----- */
@@ -926,7 +964,7 @@ function quoteData(){
   const groups=[];
   GROUPS.forEach(g=>{ const items=[];
     RATES.filter(r=>r.group===g).forEach(r=>{ const lc=lineCost(r);
-      if(r.kind==='prepurchase'){ state.prepurchase.forEach(e=>{ if((e.amount||0)!==0) items.push({kind:'pp', id:e.id, url:e.url, amount:e.amount}); }); }
+      if(r.kind==='prepurchase'){ state.prepurchase.forEach(e=>{ if((e.amount||0)!==0) items.push({kind:'pp', id:e.id, url:e.url, desc:e.desc, amount:e.amount*rateOf(r)}); }); }
       else if(lc!==0){
         if(r.kind==='time') items.push({text:`${r.name}: ${fmtQty(state.qty[r.id])} h x $${rateOf(r)}/${unitOf(r)} = ${usd.format(lc)}`});
         else if(r.kind==='material') items.push({text:`${r.name}: ${fmtQty(state.qty[r.id])} g/ml x $${rateOf(r)}/${unitOf(r)} = ${usd.format(lc)}`});
@@ -941,7 +979,7 @@ function quotePlain(groups){
   const L=['UC Davis Tech Foundry — Recharge Quote','Tier: '+TIER[state.mode],'Date: '+new Date().toISOString().slice(0,10),''];
   if(!groups.length) L.push('No active line items.','');
   groups.forEach(({g,items})=>{ L.push(g.toUpperCase());
-    items.forEach(it=>{ if(it.kind==='pp'){ const lab=it.url?`[${it.id||'(no ID)'}](${it.url})`:(it.id||'(no ID)'); L.push(`  - PrePurchasing ${lab}: ${usd.format(it.amount)}`); }
+    items.forEach(it=>{ if(it.kind==='pp'){ const lab=it.url?`[${it.id||'(no ID)'}](${it.url})`:(it.id||'(no ID)'); L.push(`  - PrePurchasing ${lab}${it.desc?' ('+it.desc+')':''}: ${usd.format(it.amount)}`); }
       else L.push(`  - ${it.text}`); });
     L.push(''); });
   const wt=(state.waiveTime?waivedTimeTotal():0)+(state.waiveEquip?waivedEquipTotal():0), wm=state.waiveMat?waivedMatTotal():0;
@@ -964,7 +1002,7 @@ function quoteHtml(groups){
   const L=[`<b>UC Davis Tech Foundry — Recharge Quote</b>`,`Tier: ${esc(TIER[state.mode])}`,`Date: ${new Date().toISOString().slice(0,10)}`,''];
   if(!groups.length) L.push('No active line items.','');
   groups.forEach(({g,items})=>{ L.push(`<b>${esc(g.toUpperCase())}</b>`);
-    items.forEach(it=>{ if(it.kind==='pp'){ const lab=it.url?`<a href="${esc(it.url)}">${esc(it.id||'(no ID)')}</a>`:esc(it.id||'(no ID)'); L.push(`&nbsp;&nbsp;- PrePurchasing ${lab}: ${usd.format(it.amount)}`); }
+    items.forEach(it=>{ if(it.kind==='pp'){ const lab=it.url?`<a href="${esc(it.url)}">${esc(it.id||'(no ID)')}</a>`:esc(it.id||'(no ID)'); L.push(`&nbsp;&nbsp;- PrePurchasing ${lab}${it.desc?' ('+esc(it.desc)+')':''}: ${usd.format(it.amount)}`); }
       else L.push(`&nbsp;&nbsp;- ${esc(it.text)}`); });
     L.push(''); });
   const wt=(state.waiveTime?waivedTimeTotal():0)+(state.waiveEquip?waivedEquipTotal():0), wm=state.waiveMat?waivedMatTotal():0;
@@ -1015,7 +1053,7 @@ function exitQuoteMode(){
   const b=$('#qEnter'); b.textContent='Enter Quote Mode'; b.classList.remove('on');
   $('#qActive').classList.add('hidden');
   document.querySelector('.panel').classList.remove('qmode-on');
-  recalc();
+  recalc(); updateConvertBtn();
 }
 function snapshotState(){
   return { qty:{...state.qty}, prepurchase:JSON.parse(JSON.stringify(state.prepurchase)), waived:{...state.waived},
@@ -1045,11 +1083,11 @@ function applySnapshot(s, withBudget){  Object.keys(state.qty).forEach(k=>state.
   document.querySelectorAll('#list .min, #waivedList .min, #waivedEqList .min, #waivedMatList .min').forEach(i=>i.value='');
   RATES.forEach(r=>updateRow(r.id,false)); updateWaivedRows(); renderPrepurchase();
 }
-function buildDeltaState(){
-  const s=state.snapshot||{qty:{},prepurchase:[],waived:{}};
+function buildDeltaState(base){
+  const s=base||state.snapshot||{qty:{},prepurchase:[],waived:{}};
   const dq={}; RATES.forEach(r=>{ dq[r.id]=Math.max(0,(state.qty[r.id]||0)-(s.qty[r.id]||0)); });
-  const used=(s.prepurchase||[]).map(e=>JSON.stringify({id:e.id,url:e.url,amount:e.amount}));
-  const dpp=[]; state.prepurchase.forEach(e=>{ const k=JSON.stringify({id:e.id,url:e.url,amount:e.amount}); const i=used.indexOf(k); if(i>=0) used.splice(i,1); else dpp.push(e); });
+  const used=(s.prepurchase||[]).map(e=>JSON.stringify({id:e.id,url:e.url,amount:e.amount,desc:e.desc||''}));
+  const dpp=[]; state.prepurchase.forEach(e=>{ const k=JSON.stringify({id:e.id,url:e.url,amount:e.amount,desc:e.desc||''}); const i=used.indexOf(k); if(i>=0) used.splice(i,1); else dpp.push(e); });
   const dw={}; Object.keys(state.waived).forEach(k=>{ dw[k]=Math.max(0,(state.waived[k]||0)-((s.waived&&s.waived[k])||0)); });
   return {dq,dpp,dw};
 }
@@ -1065,27 +1103,60 @@ function quoteBundle(deltaOnly){
 async function saveQuote(deltaOnly){
   const q=quoteBundle(deltaOnly); const total=q.total;
   const ok=await copyQuote(q.plain, q.html);
-  const s=state.snapshot, baseQ=(s&&s.qty)?s.qty:{};
+  const s=state.snapshot, baseQ=(s&&s.qty)?s.qty:{}, conv=!!state.convFrom;
+  state.convFrom=null;
   const nq={}, nb={};
   RATES.forEach(r=>{ if(r.kind==='time'||r.kind==='material'||r.kind==='cost'){
     const cur=state.qty[r.id]||0, bs=baseQ[r.id]||0; const amt=deltaOnly?Math.max(0,cur-bs):cur;
-    if(amt>0){ nq[r.id]=amt; nb[r.id]=deltaOnly?bs:0; }
+    if(amt>0){ nq[r.id]=amt; nb[r.id]=(deltaOnly||conv)?bs:0; }
   }});
   state.quoted=nq; state.quoteBase=nb;
   if(s) applySnapshot(s, false);                 // revert entries to pre-quote state
-  if(total>0){ state.budget=Math.round(total*100)/100; } else if(s){ state.budget=(s.budget!=null?Math.round(s.budget*100)/100:s.budget); }   // budget = the summarized total, to the penny
+  const billed = conv ? netTotal() : 0;          // converted: quote is on top of what is already billed
+  if(total>0){ state.budget=Math.round((billed+total)*100)/100; } else if(s){ state.budget=(s.budget!=null?Math.round(s.budget*100)/100:s.budget); }   // budget = the summarized total, to the penny
   state.budgetStatus='calculated'; updateBudgetStatus();
   const bi=$('#budgetInput'); if(bi) bi.value=(state.budget!=null && state.budget>0)?Number(state.budget).toFixed(2):'';
-  state.history.unshift({t:Date.now(), note:true, name: deltaOnly?'New charges quoted':'Client quote saved', detail:`${usd.format(total)} \u2192 budget`, mode:state.mode}); state.lastT = Date.now();
+  state.history.unshift({t:Date.now(), note:true, name: deltaOnly?'New charges quoted':(conv?'Session entries converted to quote':'Client quote saved'), detail: billed>0.005 ? `+${usd.format(total)} \u2192 budget ${usd.format(state.budget)}` : `${usd.format(total)} \u2192 budget`, mode:state.mode}); state.lastT = Date.now();
   exitQuoteMode(); refreshRows(); recalc(); renderHist();
-  try{ _histBase = baselineNow(); }catch(e){}
+  try{ _histBase = baselineNow(); _sessBase = sessBaseNow(); }catch(e){}
   const id = deltaOnly?'#qNew':'#qSave', orig = deltaOnly?'New charges only':'Save Quote';
   const btn=$(id); if(btn){ btn.textContent = ok ? 'Saved \u2713' : 'Saved (copy blocked)'; setTimeout(()=>{ const b2=$(id); if(b2) b2.textContent=orig; },1700); }
   if(!ok) window.prompt('Copy the quote below:', q.plain);
 }
 function cancelQuote(){
-  if(state.snapshot) applySnapshot(state.snapshot, true);   // restore entries + budget
+  if(state.convFrom){ applySnapshot(state.convFrom, true); state.convFrom=null; }   // converted: put the session entries back
+  else if(state.snapshot) applySnapshot(state.snapshot, true);   // restore entries + budget
   exitQuoteMode(); refreshRows();
+}
+/* ----- convert session entries to quote (v3.6) -----
+   "Session entries" = everything added since this editor opened (_sessBase).
+   They are pulled out of the bill and become the quote; the bill reverts to its
+   open-time state. Save Quote keeps that revert (remain counters measure usage
+   above the open-time quantities); Cancel puts the session entries back. */
+function sessionDelta(){
+  if(!_sessBase) return null;
+  const d=buildDeltaState(_sessBase);
+  const any = Object.keys(d.dq).some(k=>d.dq[k]>0.0001) || d.dpp.length>0 || Object.keys(d.dw).some(k=>d.dw[k]>0.0001);
+  return any ? d : null;
+}
+function updateConvertBtn(){
+  const b=$('#qConvert'); if(!b) return;
+  const has=!state.quoteMode && !locked() && !!sessionDelta();
+  b.disabled=!has; b.title = has ? 'Move the entries made since this editor opened into a quote' : 'No entries added since this editor opened';
+}
+function convertSessionToQuote(){
+  if(state.quoteMode || locked() || _scratch) return;
+  const d=sessionDelta(); if(!d) return;
+  const full=snapshotState();                      // bill incl. session entries (Cancel restores it)
+  const base=_sessBase;
+  enterQuoteMode();
+  state.snapshot={ qty:{...base.qty}, prepurchase:JSON.parse(JSON.stringify(base.prepurchase||[])), waived:{...base.waived}, budget:state.budget };
+  state.convFrom=full;
+  Object.keys(state.qty).forEach(k=>state.qty[k]=0); Object.assign(state.qty, d.dq);
+  state.prepurchase=JSON.parse(JSON.stringify(d.dpp)); state.ppEditing=null;
+  Object.keys(state.waived).forEach(k=>state.waived[k]=0); Object.assign(state.waived, d.dw);
+  document.querySelectorAll('#list .min, #waivedList .min, #waivedEqList .min, #waivedMatList .min').forEach(i=>i.value='');
+  refreshRows(); updateWaivedRows(); renderPrepurchase(); recalc();
 }
 async function copyPpSummary(){
   const ids=state.prepurchase.map(e=>(e.id||'').trim()).filter(Boolean); const text=ids.join(', '); const btn=$('#ppSumBtn');
@@ -1103,7 +1174,7 @@ function exportCSV(){
   RATES.forEach(r=>{ const tier=TIER[state.mode];
     if(r.kind==='prepurchase'){
       if(!state.prepurchase.length){ rows.push([r.name,tier,'at cost','','','0.00','']); }
-      else state.prepurchase.forEach(e=>rows.push([`${r.name} — ${e.id||'(no ID)'}`,tier,'at cost','','',(e.amount||0).toFixed(2), e.url||'']));
+      else state.prepurchase.forEach(e=>rows.push([`${r.name} — ${e.id||'(no ID)'}${e.desc?' — '+e.desc:''}`,tier,rateLabel(r),'','',((e.amount||0)*rateOf(r)).toFixed(2), e.url||'']));
     } else {
       rows.push([r.name, tier, r.kind==='cost'?'at cost':rateOf(r), (r.kind==='time'||r.kind==='material')?unitOf(r):'', r.kind==='cost'?'':fmtQty(state.qty[r.id]), lineCost(r).toFixed(2), '']);
     }
@@ -1141,7 +1212,7 @@ function resetAll(){
   state.hoursBy={};
   state.budget=null; state.budgetStatus='undefined'; updateBudgetStatus();
   state.history.unshift({t:Date.now(), reset:true, mode:state.mode, delta:-cleared}); state.lastT = Date.now();
-  try{ _histBase = baselineNow(); }catch(e){}
+  try{ _histBase = baselineNow(); _sessBase = sessBaseNow(); }catch(e){}
   document.querySelectorAll('#list .min, #waivedList .min, #waivedEqList .min, #waivedMatList .min').forEach(i=>i.value='');
   const bi=$('#budgetInput'); if(bi) bi.value='';
   RATES.forEach(r=>updateRow(r.id,false)); updateWaivedRows(); recalc(); renderHist(); renderPrepurchase();
@@ -1254,6 +1325,7 @@ build(); ensureWaivedKeys(); buildWaivers(); setMode(state.mode); syncInputsFrom
 requestAnimationFrame(()=>{ RATES.forEach(r=>{ const ref=refs[r.id]; if(ref&&ref.cost) void ref.cost.offsetWidth; }); });
 $('#modeUcd').onclick=()=>{ if(!locked()) setMode('ucd'); };
 $('#modeNon').onclick=()=>{ if(!locked()) setMode('nonuc'); };
+$('#modeNc').onclick=()=>{ if(!locked()) setMode('nc'); };
 $('#budgetInput').addEventListener('input',e=>{ const v=parseFloat(e.target.value.replace(/[^0-9.]/g,'')); state.budget=isNaN(v)?null:v; updateBudget(); saveCard(); });
 $('#budgetStatus').addEventListener('change',e=>setBudgetStatus(e.target.value));
 $('#waiveChk').addEventListener('change',e=>{ state.waiveTime=e.target.checked; $('#waived').classList.toggle('hidden', !state.waiveTime); recalc(); });
@@ -1263,6 +1335,10 @@ $('#quoteBtn').onclick=generateQuote;
 $('#qEnter').onclick=()=>{ if(locked()) return; if(state.quoteMode) cancelQuote(); else enterQuoteMode(); };
 $('#qSave').onclick=()=>saveQuote(false);
 $('#qCancel').onclick=cancelQuote;
+$('#qConvert').onclick=convertSessionToQuote;
+const cmtEl=$('#sessCmt'), cmtLeft=()=>{ const n=CMT_MAX-cmtEl.value.length, el=$('#cmtLeft');
+  el.textContent=n+(n===1?' character':' characters')+' remaining'; el.classList.toggle('low', n<=20 && n>0); el.classList.toggle('zero', n<=0); };
+cmtEl.addEventListener('input',cmtLeft); cmtLeft();
 $('#exportBtn').onclick=exportCSV;
 $('#ppSumBtn').onclick=copyPpSummary;
 $('#resetBtn').onclick=onResetClick;
@@ -1272,7 +1348,7 @@ $('#setDone').onclick=()=>$('#settings').classList.add('hidden');
 $('#setRestore').onclick=restoreDefaults;
 $('#saveCloseBtn').onclick=()=>{
   if(state.quoteMode && !_scratch){ const b=$('#saveCloseBtn'); b.textContent='Finish quote first'; setTimeout(()=>b.textContent='Save',1600); return; }
-  buildSaveEntry(); saveNow(); setTimeout(()=>{ try{ _t.closeModal(); }catch(e){} }, 150);
+  buildSaveEntry(); logSessionComment(); saveNow(); setTimeout(()=>{ try{ _t.closeModal(); }catch(e){} }, 150);
 };
 $('#cancelBtn').onclick=()=>{
   _canceling = true;
@@ -1291,6 +1367,8 @@ if(_scratch){
 _ready = true;   // from here on, user edits trigger debounced saveCard()
 _openPayload = JSON.parse(JSON.stringify(savePayload()));   // DEEP copy — serializeState returns live refs
 _histBase = baselineNow();   // diff baseline for the one-line save summary
+_sessBase = sessBaseNow();   // "session entries" baseline for Convert Session Entries to Quote
+updateConvertBtn();
 }
 
 /* ----- Trello Power-Up context dispatch ----- */
@@ -1300,7 +1378,7 @@ _histBase = baselineNow();   // diff baseline for the one-line save summary
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '3.5';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '3.6';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1318,10 +1396,12 @@ function serializeState(){
 }
 function hydrateState(d){
   if(!d || typeof d!=='object') return false;
-  if(d.mode==='ucd'||d.mode==='nonuc') state.mode=d.mode;
+  if(d.mode==='ucd'||d.mode==='nonuc'||d.mode==='nc') state.mode=d.mode;
   RATES.forEach(function(r){ state.qty[r.id] = (d.qty && typeof d.qty[r.id]==='number') ? d.qty[r.id] : 0; });
   state.prepurchase = Array.isArray(d.pp) ? d.pp.map(function(e){
-    return { id:e.id||'', url:e.url||'', amount:(typeof e.amount==='number'?e.amount:0) }; }) : [];
+    var o = { id:e.id||'', url:e.url||'', amount:(typeof e.amount==='number'?e.amount:0) };
+    if(typeof e.desc==='string' && e.desc) o.desc = e.desc.slice(0,PP_DESC_MAX);
+    return o; }) : [];
   state.budget = (typeof d.budget==='number') ? d.budget : null;
   state.budgetStatus = d.bstat || 'undefined';
   state.pbs = (typeof d.pbs==='string') ? d.pbs : undefined;
@@ -1334,7 +1414,9 @@ function hydrateState(d){
   state.hoursBy = (d.hby && typeof d.hby==='object') ? d.hby : {};
   return true;
 }
-var SAVE_DELAY = 1500, _edBC = null, _canceling = false, _openPayload = null, _histBase = null;
+var SAVE_DELAY = 1500, _edBC = null, _canceling = false, _openPayload = null, _histBase = null, _sessBase = null;
+var CMT_MAX = 160;
+function sessBaseNow(){ return { qty:{...state.qty}, prepurchase:JSON.parse(JSON.stringify(state.prepurchase||[])), waived:{...state.waived} }; }
 function baselineNow(){
   return JSON.parse(JSON.stringify({ qty: state.qty, ppn: (state.prepurchase||[]).length,
     ppsum: (state.prepurchase||[]).reduce(function(a,e){ return a+(e.amount||0); },0),
@@ -1385,6 +1467,16 @@ function buildSaveEntry(){
   _histBase = baselineNow();
   try{ renderHist(); }catch(_){}
 }
+function logSessionComment(){
+  var el = document.getElementById('sessCmt'); if(!el || _scratch) return;
+  var txt = el.value.replace(/\s+/g,' ').trim().slice(0, CMT_MAX);
+  if(!txt) return;
+  var e = { t: Date.now(), cmt: true, mode: state.mode, name: txt };
+  if(_memberTag) e.by = _memberTag;
+  state.history.unshift(e); state.lastT = e.t;
+  el.value = ''; el.dispatchEvent(new Event('input'));
+  try{ renderHist(); }catch(_){}
+}
 function saveChip(){ /* v2.6: notifications retired — Save/Cancel buttons carry the intent */ }
 /* Compact, byte-budgeted history for persistence (Trello caps card data at 4096 chars total).
    Snapshots are stripped; the list itself survives close/reopen. */
@@ -1393,7 +1485,7 @@ function serializeHist(){
   for(var i=0; i<state.history.length && out.length<40; i++){
     var e = state.history[i];
     var c = { t:e.t, name:e.name, kind:e.kind, delta:e.delta, mode:e.mode,
-              source:e.source, note:e.note, reset:e.reset, quote:e.quote, detail:e.detail, by:e.by, sum:e.sum };
+              source:e.source, note:e.note, reset:e.reset, quote:e.quote, detail:e.detail, by:e.by, sum:e.sum, cmt:e.cmt };
     Object.keys(c).forEach(function(k){ if(c[k]===undefined) delete c[k]; });
     var js = JSON.stringify(c);
     if(size + js.length + 1 > 2300) break;
@@ -1476,7 +1568,7 @@ function renderSummary(){
   var vcopy = function(v, label){
     return billing ? '<button type="button" class="fc-vc" data-act="vcopy" data-v="' + v + '" title="Copy ' + label + '" aria-label="Copy ' + label + '">' + COPY_SVG + '</button>' : '';
   };
-  var statusTxt = BSTAT_LABEL[state.budgetStatus] || '';
+  var statusTxt = [state.mode==='nc' ? 'No Charge' : '', BSTAT_LABEL[state.budgetStatus] || ''].filter(Boolean).join(' \u00b7 ');
   var budTxt = (state.budget!=null && state.budget>0) ? ('Budget ' + usd.format(state.budget)) : '';
   h += '<div class="fc-top"><b class="sv-total">' + usd.format(total) + '</b>' +
        vcopy(total.toFixed(2), 'total') +
@@ -1515,7 +1607,8 @@ function renderSummary(){
       (state.prepurchase||[]).forEach(function(e, i){
         out += '<div class="fc-line"><span class="fc-qbox">' + (i+1) + '</span>' +
                (billing ? '<button type="button" class="fc-vc" data-act="ppcopy" data-i="' + i + '" title="Copy order details" aria-label="Copy order details">' + COPY_SVG + '</button>' : '') +
-               '<span class="fc-name">' + esc(e.id || 'Order ' + (i+1)) + '<i>' + usd.format(e.amount||0) + '</i></span></div>';
+               '<span class="fc-name">' + esc(e.id || 'Order ' + (i+1)) + '<i>' + usd.format(e.amount||0) + '</i></span></div>' +
+               (e.desc ? '<div class="fc-ppdesc" title="' + esc(e.desc) + '">' + esc(e.desc) + '</div>' : '');
       });
     }
     return out;
@@ -1581,17 +1674,18 @@ function estimateFaceHeight(d){
   /* Two itemized columns. Left column (2+4 lines) is fixed; right column
      (3 material lines + supply orders) grows with pp entries.
      sizeTo (if alive) and internal scroll remain as correctors. */
-  var pp = 0, empty = true;
+  var pp = 0, ppd = 0, empty = true;
   try{
     if(d && typeof d === 'object'){
-      if(Array.isArray(d.pp)){ pp = d.pp.length; if(pp) empty = false; }
+      if(Array.isArray(d.pp)){ pp = d.pp.length; if(pp) empty = false;
+        ppd = d.pp.filter(function(e){ return e && e.desc; }).length; }
       if(d.qty && Object.keys(d.qty).some(function(k){ return d.qty[k] > 0; })) empty = false;
       if(typeof d.budget === 'number' && d.budget > 0) empty = false;
     }
   }catch(e){}
   if(empty) return 66;
   var left = 2*22 + 6*23;                 // 2 headers + 6 lines
-  var right = 2*22 + (3 + pp)*23;         // 2 headers + 3 material lines + orders
+  var right = 2*22 + (3 + pp)*23 + ppd*16; // 2 headers + 3 material lines + orders (+ description lines)
   var h = 110 + Math.max(left, right);    // top row + panel padding + Trello slack (generous: undershoot = scroll flicker)
   try{
     if(d && typeof d === 'object'){
@@ -1688,7 +1782,7 @@ function wireFaceActions(){
       faceRelaySave();   // triggers t.set via connector; section reload confirms
     } else if(b.dataset.act === 'ppcopy'){
       var pp = state.prepurchase || [];
-      var line = function(e, i){ return (e.id || 'Order ' + (i+1)) + (e.url && e.url !== e.id ? ' (' + e.url + ')' : '') + ' \u2014 ' + usd.format(e.amount||0); };
+      var line = function(e, i){ return (e.id || 'Order ' + (i+1)) + (e.url && e.url !== e.id ? ' (' + e.url + ')' : '') + (e.desc ? ' \u2014 ' + e.desc : '') + ' \u2014 ' + usd.format(e.amount||0); };
       var text;
       if(b.dataset.i === 'all'){
         var tot = pp.reduce(function(a,e){ return a + (e.amount||0); }, 0);
