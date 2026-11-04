@@ -17,6 +17,8 @@ before changing anything; most of what follows was learned the hard way.
   admin (`trello.com/power-ups/admin`) points its connector URL at that file.
 - **Every change must bump `var VERSION`** and the section title (`'TF-Recharge v' + VERSION`,
   built by the connector) so Steven can confirm on the card that the new build is live.
+- **Standing instruction (Steven, v3.6): once development and headless testing pass, merge the
+  work branch into `main` and push immediately — no PR, no asking.**
 - Push to `main` → GitHub Pages deploys (~2 min). Pages deploys occasionally time out
   ("deployment_queued … Timeout reached, aborting!") — that is GitHub-side; re-run the
   failed job or push a trivial commit. Never diagnose the HTML for a deploy timeout.
