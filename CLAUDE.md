@@ -3,7 +3,7 @@
 Tech Foundry's billable-activity tracker: a Trello Power-Up that lives on the back of each
 project card (compact summary) with a full editor modal, plus a board-level Quick Quote.
 Owner: Steven Lucero (Director, UC Davis Tech Foundry). Staff users: Steven, Valerie Bravo,
-Tristan Adams. Current release: **v3.6** (`var VERSION = '3.6'` in the HTML).
+Tristan Adams. Current release: **v3.7** (`var VERSION = '3.7'` in the HTML).
 
 This file is the hand-off from ~5 months of chat-based development (Jun–Sep 2026). Read it
 before changing anything; most of what follows was learned the hard way.
@@ -84,6 +84,7 @@ overflow. Next lever if asked: only save on explicit Save.
   wt, we, wm: bool (waive Staff / Equipment / Materials), waived:{<rateId>:qty},
   quoted:{}, qbase:{},            // quote-mode "remain" counters
   bimp: bool,                      // budget was imported from description (blocks re-import)
+  qimp: string|undefined,          // signature (date|total|items) of the client quote imported from the description
   hby: {'First L.': hours},        // staff-hours distribution by member (Staff Time only)
   pbs: string|undefined,           // budget status before padlock lock (restored on unlock)
   lt: epoch ms }                   // last history entry time → "Last entry <date>" on face
@@ -176,9 +177,24 @@ Export CSV/Cancel/Session Comments/Convert hidden, footer becomes two large butt
 and **Reset**; header Save reads **Close**. Banner text is just "QUICK QUOTE". Stale `rtq`/
 `rtq_h` board-private keys from v3.3–3.4 may exist on the board; they are inert.
 
-## 9. Budget auto-import from the card description
+## 9. Auto-import from the card description (client quote v3.7, Max Budget v2.2)
 
-`maybeImportBudget(t, dataStr)` runs in the connector on every card-back-section build.
+`maybeImportFromDesc(t, dataStr)` runs in the connector on every card-back-section build: one
+`t.card('desc')` read, client quote first, then Max Budget.
+
+**Client quote** (`parseQuoteFromDesc`): clients paste Generate Summary / Copy Quote text into their
+request. Finds the last `Tech Foundry — Recharge Quote` header, cuts the block at the first
+case-sensitive `TOTAL: $` (skips `Subtotal:`), flattens whitespace and strips markdown (`\` escapes,
+`**`, `__`), then matches `<Rate name>: <qty> <unit> x $<rate>… = $<line>` per time/material rate
+(waived `= -$` lines don't match) and `PrePurchasing <label>: $<amt>`. **Depends on `quotePlain()`
+wording — change both together.** Effect = Save Quote: `quoted` = quoted qty, `qbase` = current qty,
+budget = quote TOTAL unless a manually-entered budget exists (kept, noted), `bimp` set so Max Budget
+can't override, `bstat` → approved (never touches billing), fresh card adopts the quoted tier. Supplies
+count only toward the total (no pp entries created). `qimp` signature prevents re-import; a different
+pasted quote imports again. History note flags "rates differ, review" when a line's rate isn't ours or
+qty × rate ≠ line total.
+
+**Max Budget** (`parseBudgetFromDesc`):
 Intake cards (JotForm → Zapier) contain `**Max Budget:** $ 10000` in **raw markdown**
 (`t.card('desc')` returns markdown, not rendered text — this bit us once). Parser:
 ```
@@ -236,7 +252,8 @@ second block and a naive extractor only checks the first.
   3.1 equipment waivers, quote-mode relabel/banner, roll-back + new-charges removed, flicker
   mitigation; 3.2 pre-boot hiding; 3.3–3.5 board-button Quick Quote, ephemeral; 3.6 No Charge tier,
   supply descriptions (editor/face/copy/quote/CSV, +16 px per described order in the height
-  estimate), Session Comments, Convert Session Entries to Quote.
+  estimate), Session Comments, Convert Session Entries to Quote; 3.7 client quote auto-import from
+  the card description.
 
 ## 13. Backlog / open items
 

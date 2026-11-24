@@ -1378,7 +1378,7 @@ updateConvertBtn();
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '3.6';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '3.7';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1392,7 +1392,7 @@ function serializeState(){
   return { v:1, mode:state.mode, qty:state.qty, pp:state.prepurchase,
     budget:state.budget, bstat:state.budgetStatus,
     wt:state.waiveTime, we:state.waiveEquip, wm:state.waiveMat, waived:state.waived,
-    quoted:state.quoted, qbase:state.quoteBase, bimp:!!state.budgetImported, hby:state.hoursBy||{}, pbs:state.pbs, lt:state.lastT };
+    quoted:state.quoted, qbase:state.quoteBase, bimp:!!state.budgetImported, qimp:state.qimp, hby:state.hoursBy||{}, pbs:state.pbs, lt:state.lastT };
 }
 function hydrateState(d){
   if(!d || typeof d!=='object') return false;
@@ -1411,6 +1411,7 @@ function hydrateState(d){
   state.quoted = (d.quoted && typeof d.quoted==='object') ? d.quoted : {};
   state.quoteBase = (d.qbase && typeof d.qbase==='object') ? d.qbase : {};
   state.budgetImported = !!d.bimp;
+  state.qimp = (typeof d.qimp==='string') ? d.qimp : undefined;
   state.hoursBy = (d.hby && typeof d.hby==='object') ? d.hby : {};
   return true;
 }
@@ -1643,29 +1644,91 @@ function parseBudgetFromDesc(desc){
   if(!isFinite(v) || v <= 0 || v > 10000000) return null;
   return Math.round(v*100)/100;
 }
-function maybeImportBudget(t, dataStr){
-  /* Returns a promise resolving to the (possibly updated) dataStr. Never rejects. */
+/* ----- client quote auto-import from the card description (v3.7) -----
+   Clients paste the text of "Generate Summary" / "Copy Quote" into their service
+   request, which lands in the card description. Parsing works on a flattened copy
+   of just the quote block, so lost line breaks, markdown list dashes, bold markers
+   and backslash escapes don't matter. Waived lines ("= -$") and Subtotal are
+   skipped. Depends on the quotePlain() wording — keep the two in sync. */
+function parseQuoteFromDesc(desc){
+  if(!desc || typeof desc !== 'string') return null;
+  var txt = desc.replace(/\\(.)/g,'$1').replace(/\*\*|__/g,'').replace(/&nbsp;/gi,' ').replace(/[ \s]+/g,' ');
+  var hdr = /Tech Foundry\W*Recharge Quote/gi, m, at = -1;
+  while((m = hdr.exec(txt))) at = m.index;              // last pasted quote wins
+  if(at < 0) return null;
+  var blk = txt.slice(at);
+  var tm = /(?:^|[^A-Za-z])TOTAL:\s*\$\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)/.exec(blk);   // case-sensitive: skips "Subtotal:"
+  if(!tm) return null;
+  blk = blk.slice(0, tm.index + tm[0].length);
+  var num = function(v){ return parseFloat(String(v).replace(/,/g,'')); };
+  var total = num(tm[1]);
+  if(!isFinite(total) || total < 0 || total > 10000000) return null;
+  var tierM = /Tier:\s*(Internal|External|No Charge)/i.exec(blk);
+  var mode = tierM ? ({internal:'ucd', external:'nonuc', 'no charge':'nc'})[tierM[1].toLowerCase()] : null;
+  var dateM = /Date:\s*(\d{4}-\d{2}-\d{2})/.exec(blk);
+  var items = {}, lines = 0, mismatch = false;
+  RATES.forEach(function(r){
+    if(r.kind !== 'time' && r.kind !== 'material') return;
+    var nm = r.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    var re = new RegExp('(?:^|[^A-Za-z0-9])' + nm + ':\\s*([0-9][0-9,]*(?:\\.[0-9]+)?)\\s*[a-z/]*\\s*x\\s*\\$\\s*([0-9][0-9,]*(?:\\.[0-9]+)?)[^=]*=\\s*\\$\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)');
+    var lm = re.exec(blk); if(!lm) return;
+    var q = num(lm[1]), rate = num(lm[2]), lt = num(lm[3]);
+    if(!(q > 0)) return;
+    items[r.id] = q; lines++;
+    if(Math.abs(q*rate - lt) > 0.011) mismatch = true;                       // line math doesn't add up
+    if(mode && mode !== 'nc' && Math.abs(rate - (mode==='ucd' ? r.ucd : r.nonuc)) > 0.0001) mismatch = true;   // not our rate
+  });
+  var pp = [], ppre = /PrePurchasing (.+?):\s*\$\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)/g, pm;
+  while((pm = ppre.exec(blk))){ pp.push({ label: pm[1].trim(), amount: num(pm[2]) }); }
+  if(!lines && !pp.length) return null;
+  return { mode: mode, date: dateM ? dateM[1] : '', items: items, pp: pp, total: Math.round(total*100)/100,
+           mismatch: mismatch, sig: (dateM ? dateM[1] : '') + '|' + total.toFixed(2) + '|' + Object.keys(items).sort().map(function(k){ return k + items[k]; }).join(',') };
+}
+function applyImportedQuote(nd, q){
+  /* Same effect as Save Quote: remain counters + budget + history note. */
+  var qty = nd.qty || {};
+  var empty = !Object.keys(qty).some(function(k){ return qty[k] > 0; }) && !(nd.pp && nd.pp.length);
+  if(empty && q.mode) nd.mode = q.mode;                                   // fresh card: adopt the quoted tier
+  nd.quoted = {}; nd.qbase = {};
+  Object.keys(q.items).forEach(function(id){ nd.quoted[id] = q.items[id]; nd.qbase[id] = qty[id] || 0; });
+  var manualBudget = typeof nd.budget === 'number' && nd.budget > 0 && !nd.bimp && !nd.qimp;
+  if(!manualBudget) nd.budget = q.total;
+  nd.bimp = true;                                                         // a quote outranks "Max Budget"
+  if(nd.bstat !== 'billing') nd.bstat = 'approved';                       // client submitted it with their request
+  nd.qimp = q.sig;
+  nd.lt = Date.now();
+  var tier = q.mode ? TIER[q.mode] : '';
+  return { t: nd.lt, note: true,
+           name: 'Client quote imported from card description' + (q.mismatch ? ' — rates differ, review' : '') +
+                 (manualBudget ? ' (budget kept)' : ''),
+           detail: usd.format(q.total) + (tier ? ' · ' + tier : '') };
+}
+function maybeImportFromDesc(t, dataStr){
+  /* Quote first, then "Max Budget". Returns a promise of the (possibly updated)
+     dataStr. Never rejects. Re-reads rt at the last instant and merges into the
+     freshest copy so a concurrent editor save can't be clobbered. */
   var d = null; try{ d = dataStr ? JSON.parse(dataStr) : null; }catch(e){}
-  var hasBudget = d && typeof d.budget === 'number' && d.budget > 0;
-  if(hasBudget || (d && d.bimp)) return Promise.resolve(dataStr);
+  var hasBudget = function(x){ return x && ((typeof x.budget === 'number' && x.budget > 0) || x.bimp); };
   return t.card('desc').then(function(card){
-    var v = parseBudgetFromDesc(card && card.desc);
-    if(v == null){ return dataStr; }
-    /* Re-read rt at the last instant and merge ONLY the budget fields into the
-       freshest copy — a save landing between our first read and this write can
-       no longer be clobbered, and a manual budget always wins. */
+    var desc = card && card.desc;
+    var q = parseQuoteFromDesc(desc);
+    if(q && d && d.qimp === q.sig) q = null;                               // already imported
+    var bv = hasBudget(d) ? null : parseBudgetFromDesc(desc);
+    if(!q && bv == null) return dataStr;
     return t.get('card','shared','rt').then(function(fresh){
-      if(fresh && ((typeof fresh.budget === 'number' && fresh.budget > 0) || fresh.bimp)) return JSON.stringify(fresh);
       var nd = fresh || d || { v:1, mode:'ucd', qty:{}, pp:[], budget:null, bstat:'undefined',
                     wt:false, wm:false, waived:{}, quoted:{}, qbase:{} };
-      nd.budget = v; nd.bstat = 'approved'; nd.bimp = true; nd.lt = Date.now();
-    var hist = [{ t:Date.now(), note:true, name:'Budget imported from card description', detail: usd.format(v) }];
+      var notes = [];
+      if(q && nd.qimp !== q.sig) notes.push(applyImportedQuote(nd, q));
+      if(bv != null && !hasBudget(nd)){
+        nd.budget = bv; nd.bstat = 'approved'; nd.bimp = true; nd.lt = Date.now();
+        notes.push({ t:Date.now(), note:true, name:'Budget imported from card description', detail: usd.format(bv) });
+      }
+      if(!notes.length) return JSON.stringify(nd);
+      var write = function(hist){ return t.set('card','shared',{ rt: nd, rt_h: hist }).then(function(){ return JSON.stringify(nd); }); };
       return t.get('card','shared','rt_h').then(function(hOld){
-        if(Array.isArray(hOld)) hist = hist.concat(hOld).slice(0,40);
-        return t.set('card','shared',{ rt: nd, rt_h: hist }).then(function(){ return JSON.stringify(nd); });
-      }).catch(function(){
-        return t.set('card','shared',{ rt: nd, rt_h: hist }).then(function(){ return JSON.stringify(nd); });
-      });
+        return write(notes.concat(Array.isArray(hOld) ? hOld : []).slice(0,40));
+      }, function(){ return write(notes); });
     });
   }).catch(function(){ return dataStr; });
 }
@@ -1743,7 +1806,7 @@ function initConnector(){
         .catch(function(){ return ''; });
       var timeout = new Promise(function(res){ setTimeout(function(){ res(''); }, 1500); });
       return Promise.race([read, timeout])
-        .then(function(dataStr){ return maybeImportBudget(t, dataStr); })
+        .then(function(dataStr){ return maybeImportFromDesc(t, dataStr); })
         .then(buildSection);
     }
   });
