@@ -3,7 +3,7 @@
 Tech Foundry's billable-activity tracker: a Trello Power-Up that lives on the back of each
 project card (compact summary) with a full editor modal, plus a board-level Quick Quote.
 Owner: Steven Lucero (Director, UC Davis Tech Foundry). Staff users: Steven, Valerie Bravo,
-Tristan Adams. Current release: **v3.7** (`var VERSION = '3.7'` in the HTML).
+Tristan Adams. Current release: **v3.8** (`var VERSION = '3.8'` in the HTML).
 
 This file is the hand-off from ~5 months of chat-based development (Jun–Sep 2026). Read it
 before changing anything; most of what follows was learned the hard way.
@@ -127,6 +127,10 @@ minimum flag `qminHint`).
 3. Two columns: **Staff Time + Equipment Time** | **Materials + Supplies**. Group header =
    name + `$subtotal` snug beside it. Lines = `[qty box] Name $rate` (qty box blue when
    non-zero). Supplies lists each order as `[n] ID — $amount` (ID falls back to "Order n").
+   **Waivers (v3.8):** where a waiver group is checked, the qty box shows the *billed* qty
+   (tallied − waived, `waivedQty()`), group subtotals are net of waivers, and locked copiers
+   copy the billed qty. The editor shows the full tallied qty with `*` (tooltip "n waived — m
+   billed"). `waivedCost()` caps the waiver at the tallied qty (over-waiving can't go negative).
 4. Waived row (green, when any), then `Last entry Mon D, YYYY` bottom-right.
 5. Empty card → single line **"No recharge details"**, no panel background, 66 px.
 
@@ -253,7 +257,7 @@ second block and a naive extractor only checks the first.
   mitigation; 3.2 pre-boot hiding; 3.3–3.5 board-button Quick Quote, ephemeral; 3.6 No Charge tier,
   supply descriptions (editor/face/copy/quote/CSV, +16 px per described order in the height
   estimate), Session Comments, Convert Session Entries to Quote; 3.7 client quote auto-import from
-  the card description.
+  the card description; 3.8 waived quantities netted on the compact view, `*` in the editor.
 
 ## 13. Backlog / open items
 

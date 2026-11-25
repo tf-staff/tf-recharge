@@ -567,7 +567,10 @@ const sumAll = () => RATES.reduce((a,r)=>a+lineCost(r),0);
 const waivableTime = () => RATES.filter(r=>r.group==='Staff Time' && r.kind==='time');
 const waivableMat  = () => RATES.filter(r=>r.group==='Materials'  && r.kind==='material');
 const waivableEquip = () => RATES.filter(r=>r.group==='Equipment Time' && r.kind==='time');
-function waivedCost(r){ const q=state.waived[r.id]||0; return r.kind==='material' ? q/MAT_PER*rateOf(r) : q*rateOf(r); }
+function waiveOn(r){ return (state.waiveTime && r.group==='Staff Time' && r.kind==='time') || (state.waiveEquip && r.group==='Equipment Time' && r.kind==='time') || (state.waiveMat && r.group==='Materials' && r.kind==='material'); }
+function waivedQty(r){ return waiveOn(r) ? Math.max(0, Math.min(state.qty[r.id]||0, state.waived[r.id]||0)) : 0; }   // v3.8: applied waiver, capped at the tallied qty
+function waivedCost(r){ const q=Math.max(0, Math.min(state.waived[r.id]||0, state.qty[r.id]||0));   // v3.8: can't waive more than was tallied
+  return r.kind==='material' ? q/MAT_PER*rateOf(r) : q*rateOf(r); }
 const waivedTimeTotal = () => waivableTime().reduce((a,r)=>a+waivedCost(r),0);
 const waivedMatTotal  = () => waivableMat().reduce((a,r)=>a+waivedCost(r),0);
 const waivedEquipTotal = () => waivableEquip().reduce((a,r)=>a+waivedCost(r),0);
@@ -806,7 +809,7 @@ function updateRow(id,flash){
   const r=RATES.find(x=>x.id===id); if(!r) return; const ref=refs[id]; if(!ref) return; const m=meta[r.kind]; const q=state.qty[id];
   if(r.kind==='prepurchase'){ /* count shown via entries list below */ }
   else if(r.kind==='cost'){ ref.qty.textContent = q?usd.format(q):'—'; }
-  else { ref.qty.textContent = fmtQty(q); }
+  else { markWaivedQty(r); }
   ref.cost.textContent = usd.format(lineCost(r));
   ref.item.classList.toggle('zero', lineCost(r)===0);
   if(ref.rem){
@@ -821,6 +824,12 @@ function updateRow(id,flash){
   }
   if(flash){ ref.cost.classList.remove('tick'); void ref.cost.offsetWidth; ref.cost.classList.add('tick'); }
   if(ref.qty){ const below=(r.kind==='time'||r.kind==='material') && belowMin(q, rowMin(r)); ref.qty.classList.toggle('under', below); }
+}
+function markWaivedQty(r){
+  const ref=refs[r.id]; if(!ref || !ref.qty || r.kind==='prepurchase' || r.kind==='cost') return;
+  const q=state.qty[r.id]||0, w=waivedQty(r);
+  ref.qty.textContent = fmtQty(q) + (w>0 ? '*' : '');
+  ref.qty.title = w>0 ? `${fmtQty(w)} waived \u2014 ${fmtQty(q-w)} billed` : '';
 }
 function rowMin(r){ return (r.kind==='time'||r.kind==='material') ? (r.min||0) : 0; }
 function belowMin(res, mn){ return mn>0 && res>1e-9 && res < mn-1e-9; }
@@ -894,7 +903,7 @@ function recalc(){
     if(qn) qn.textContent=usd.format(dn);
     if(qw) qw.style.display=(state.quoteMode && !state.convFrom && Math.abs(dn-full)>0.005)?'':'none';
   }
-  updateWaivedRows(); updateBudget(); updateConvertBtn();
+  updateWaivedRows(); updateBudget(); updateConvertBtn(); RATES.forEach(markWaivedQty);
   if(state.quoteMode){ const bad=anyBelowMin();
     const sv=$('#qSave'), nw=null, hint=$('#qminHint');
     const full=netTotal();
@@ -1378,7 +1387,7 @@ updateConvertBtn();
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '3.7';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '3.8';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
@@ -1562,7 +1571,7 @@ function renderSummary(){
   var total = netTotal();
   var groupSub = function(g){
     return RATES.filter(function(r){ return r.group===g; })
-                .reduce(function(a,r){ return a + lineCost(r); }, 0);
+                .reduce(function(a,r){ return a + lineCost(r) - (waiveOn(r) ? waivedCost(r) : 0); }, 0);   // net of applied waivers
   };
   var h = '';
   var billing = state.budgetStatus === 'billing';
@@ -1599,7 +1608,7 @@ function renderSummary(){
                 ? '<button type="button" class="fc-vc" data-act="ppcopy" data-i="all" title="Copy all supply orders" aria-label="Copy all supply orders">' + COPY_SVG + '</button>' : '') +
               '</div>';
     RATES.filter(function(r){ return r.group===g && r.kind!=='prepurchase'; }).forEach(function(r){
-      var q = state.qty[r.id]||0;
+      var q = Math.max(0, (state.qty[r.id]||0) - waivedQty(r));   // v3.8: compact view shows billed qty (tallied minus waived)
       out += '<div class="fc-line"><span class="fc-qbox' + (q>0?' nz':'') + '">' + fmtQty(q) + '</span>' +
              vcopy(fmtQty(q), r.name) +
              '<span class="fc-name">' + esc(r.name) + '<i>' + rateLabel(r) + '</i></span></div>';
