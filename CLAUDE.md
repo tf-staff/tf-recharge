@@ -3,7 +3,7 @@
 Tech Foundry's billable-activity tracker: a Trello Power-Up that lives on the back of each
 project card (compact summary) with a full editor modal, plus a board-level Quick Quote.
 Owner: Steven Lucero (Director, UC Davis Tech Foundry). Staff users: Steven, Valerie Bravo,
-Tristan Adams. Current release: **v3.8** (`var VERSION = '3.8'` in the HTML).
+Tristan Adams. Current release: **v3.9** (`var VERSION = '3.9'` in the HTML).
 
 This file is the hand-off from ~5 months of chat-based development (Jun–Sep 2026). Read it
 before changing anything; most of what follows was learned the hard way.
@@ -87,7 +87,8 @@ overflow. Next lever if asked: only save on explicit Save.
   qimp: string|undefined,          // signature (date|total|items) of the client quote imported from the description
   hby: {'First L.': hours},        // staff-hours distribution by member (Staff Time only)
   pbs: string|undefined,           // budget status before padlock lock (restored on unlock)
-  lt: epoch ms }                   // last history entry time → "Last entry <date>" on face
+  lt: epoch ms }                   // last history entry time → "Last entry <date>" on face; v3.9: any waiver
+                                   // change (qty, edit, checkbox) also stamps it immediately (`touchWaiver`), not just Save
 ```
 `rt_h` = `serializeHist()`: history entries stripped of snapshots, **byte-budgeted to ~2,300
 chars / 40 entries** (oldest trimmed). Entry kinds: `{sum:true, name:'+1.5 h Engineer, …',
@@ -257,7 +258,8 @@ second block and a naive extractor only checks the first.
   mitigation; 3.2 pre-boot hiding; 3.3–3.5 board-button Quick Quote, ephemeral; 3.6 No Charge tier,
   supply descriptions (editor/face/copy/quote/CSV, +16 px per described order in the height
   estimate), Session Comments, Convert Session Entries to Quote; 3.7 client quote auto-import from
-  the card description; 3.8 waived quantities netted on the compact view, `*` in the editor.
+  the card description; 3.8 waived quantities netted on the compact view, `*` in the editor; 3.9
+  waiver changes update the face's last-entry date even when the editor is closed without Save.
 
 ## 13. Backlog / open items
 

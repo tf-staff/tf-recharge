@@ -886,10 +886,11 @@ function updateWaivedRows(){
   const ms=$('#waivedMatSub'); if(ms) ms.textContent='\u2212'+usd.format(waivedMatTotal());
 }
 function addWaived(id,delta){ if(locked()) return; const r=RATES.find(x=>x.id===id); const before=state.waived[id]||0; state.waived[id]=Math.max(0,before+delta); const applied=state.waived[id]-before;
-  recalc(); renderHist(); }
+  if(applied!==0) touchWaiver(); recalc(); renderHist(); }
+function touchWaiver(){ if(!state.quoteMode && !_scratch) state.lastT = Date.now(); }   // v3.9: waivers count toward "Last entry" even without Save
 function startWaivedEdit(id){ const ref=wrefs[id]; ref.qedit.value=fmtQty(state.waived[id]||0); ref.qty.hidden=true; ref.qedit.hidden=false; ref.qedit.focus(); ref.qedit.select(); }
 function commitWaivedEdit(id,save){ const ref=wrefs[id];
-  if(save){ const v=parseFloat(ref.qedit.value); if(!isNaN(v)){ state.waived[id]=Math.max(0,v); } }
+  if(save){ const v=parseFloat(ref.qedit.value); if(!isNaN(v)){ const nv=Math.max(0,v); if(nv!==(state.waived[id]||0)) touchWaiver(); state.waived[id]=nv; } }
   ref.qedit.hidden=true; ref.qty.hidden=false; recalc(); renderHist(); }
 
 function recalc(){
@@ -1337,9 +1338,9 @@ $('#modeNon').onclick=()=>{ if(!locked()) setMode('nonuc'); };
 $('#modeNc').onclick=()=>{ if(!locked()) setMode('nc'); };
 $('#budgetInput').addEventListener('input',e=>{ const v=parseFloat(e.target.value.replace(/[^0-9.]/g,'')); state.budget=isNaN(v)?null:v; updateBudget(); saveCard(); });
 $('#budgetStatus').addEventListener('change',e=>setBudgetStatus(e.target.value));
-$('#waiveChk').addEventListener('change',e=>{ state.waiveTime=e.target.checked; $('#waived').classList.toggle('hidden', !state.waiveTime); recalc(); });
-$('#waiveMatChk').addEventListener('change',e=>{ state.waiveMat=e.target.checked; $('#waivedMat').classList.toggle('hidden', !state.waiveMat); recalc(); });
-$('#waiveEqChk').addEventListener('change',e=>{ state.waiveEquip=e.target.checked; $('#waivedEq').classList.toggle('hidden', !state.waiveEquip); recalc(); });
+$('#waiveChk').addEventListener('change',e=>{ state.waiveTime=e.target.checked; touchWaiver(); $('#waived').classList.toggle('hidden', !state.waiveTime); recalc(); });
+$('#waiveMatChk').addEventListener('change',e=>{ state.waiveMat=e.target.checked; touchWaiver(); $('#waivedMat').classList.toggle('hidden', !state.waiveMat); recalc(); });
+$('#waiveEqChk').addEventListener('change',e=>{ state.waiveEquip=e.target.checked; touchWaiver(); $('#waivedEq').classList.toggle('hidden', !state.waiveEquip); recalc(); });
 $('#quoteBtn').onclick=generateQuote;
 $('#qEnter').onclick=()=>{ if(locked()) return; if(state.quoteMode) cancelQuote(); else enterQuoteMode(); };
 $('#qSave').onclick=()=>saveQuote(false);
@@ -1387,7 +1388,7 @@ updateConvertBtn();
    - editor    : the full tool, opened in a pop-out modal (?view=editor)
    - standalone : the file opened directly in a browser (no Trello) -> full tool  */
 var SELF = location.origin + location.pathname;              // this file's URL, query stripped
-var VERSION = '3.8';                                         // shown in the panel; connector no longer embeds it
+var VERSION = '3.9';                                         // shown in the panel; connector no longer embeds it
 var _t = null, _ready = false, _saveTimer = null;            // Trello iframe handle + save gating
 var TRELLO_ICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>');
